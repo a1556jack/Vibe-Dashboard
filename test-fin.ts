@@ -1,0 +1,1 @@
+import { fetchFinancialDetailData } from './src/lib/sheet-data.ts'; fetchFinancialDetailData().then(data => console.log('Parsed Financial Detail Months:', data.months.map(m => m.month))).catch(console.error);  

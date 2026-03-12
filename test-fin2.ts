@@ -1,0 +1,1 @@
+import { fetchFinancialDetailData } from './src/lib/sheet-data.ts'; fetchFinancialDetailData().then(d => console.log('Parsed detailed rows:\n' + JSON.stringify(d.months.map(m => ({ month: m.month, 합계: m.용역수입.합계 })), null, 2))).catch(console.error);  

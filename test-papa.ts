@@ -1,0 +1,1 @@
+import Papa from 'papaparse'; fetch('https://docs.google.com/spreadsheets/d/110UQXJ-yN6bchhrKw4zEerYef44Qy5nNqiXLNVyZTEw/export?format=csv&gid=0').then(r => r.text()).then(t => { const rows = Papa.parse(t).data; console.log(rows[0].slice(26, 32)); console.log(rows[4].slice(26, 32)); }).catch(console.error);  
