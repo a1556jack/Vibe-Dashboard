@@ -158,13 +158,18 @@ export function OverviewClient({
     }, [])
 
     useEffect(() => {
-        rawDataPromise.then(data => {
-            setRawData(data)
-            setIsRawDataLoading(false)
-        }).catch(err => {
-            console.error("Failed to load raw data:", err)
-            setIsRawDataLoading(false)
-        })
+        const loadRawData = async () => {
+            if (!rawDataPromise) return;
+            try {
+                const data = await rawDataPromise;
+                setRawData(data);
+                setIsRawDataLoading(false);
+            } catch (err) {
+                console.error("Failed to load raw data:", err);
+                setIsRawDataLoading(false);
+            }
+        };
+        loadRawData();
     }, [rawDataPromise])
     const rawDataMonths = useMemo(() => {
         const set = new Set(rawData.map(r => r.yearMonth).filter(Boolean));

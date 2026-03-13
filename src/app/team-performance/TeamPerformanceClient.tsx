@@ -4,8 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend } from "recharts"
 import { ChevronDown, CheckSquare, Square } from "lucide-react"
-import { generateTeamBreakdown } from "@/lib/analysis-engine"
-import type { RawDataRow } from "@/lib/sheet-data"
+import type { TeamBreakdown } from "@/lib/sheet-data"
 
 type CategoryFilter = "ALL" | "현장" | "소액" | "조치"
 
@@ -74,10 +73,10 @@ function MultiSelectDropdown({
 }
 
 export function TeamPerformanceClient({
-    rawData,
+    aggregatedData,
     availableMonths
 }: {
-    rawData: RawDataRow[],
+    aggregatedData: Record<string, TeamBreakdown[]>,
     availableMonths: string[]
 }) {
     const [mounted, setMounted] = useState(false)
@@ -85,10 +84,11 @@ export function TeamPerformanceClient({
         setMounted(true)
     }, [])
 
-    // 0. Extract all unique regions from raw data for mapping
+    // 0. Extract all unique regions from aggregated data for mapping
     const allUniqueRegions = useMemo(() => {
-        return Array.from(new Set(rawData.map(r => r.권역시공팀))).filter(Boolean).sort()
-    }, [rawData])
+        const allBreakdowns = Object.values(aggregatedData).flat();
+        return Array.from(new Set(allBreakdowns.map(r => r.region))).filter(Boolean).sort()
+    }, [aggregatedData])
 
     const hyunjangRegions = useMemo(() => allUniqueRegions.filter(r => r.startsWith('H')), [allUniqueRegions])
     const soaekRegions = useMemo(() => allUniqueRegions.filter(r => r.startsWith('F')), [allUniqueRegions])
@@ -134,11 +134,38 @@ export function TeamPerformanceClient({
         });
     }
 
-    // 1. Get raw breakdown (supports multiple months)
+    // 1. Get raw breakdown (merges pre-aggregated monthly data)
     const allBreakdown = useMemo(() => {
-        if (!selectedMonths.size || !rawData.length) return []
-        return generateTeamBreakdown(rawData, Array.from(selectedMonths))
-    }, [rawData, selectedMonths])
+        if (!selectedMonths.size) return []
+        
+        const selectedMonthArrays = Array.from(selectedMonths).map(m => aggregatedData[m] || []);
+        const merged = new Map<string, TeamBreakdown>();
+
+        selectedMonthArrays.forEach(monthArr => {
+            monthArr.forEach(item => {
+                const key = `${item.region}|${item.team}`;
+                if (!merged.has(key)) {
+                    merged.set(key, { ...item });
+                } else {
+                    const existing = merged.get(key)!;
+                    existing.resultAmount += item.resultAmount;
+                    existing.normalCost += item.normalCost;
+                    existing.extraCost += item.extraCost;
+                    existing.workDays += item.workDays;
+                }
+            });
+        });
+
+        const result = Array.from(merged.values());
+        
+        // Sort by region, then by total cost (same as generateTeamBreakdown logic)
+        result.sort((a, b) => {
+            if (a.region !== b.region) return a.region.localeCompare(b.region);
+            return (b.normalCost + b.extraCost) - (a.normalCost + a.extraCost);
+        });
+
+        return result;
+    }, [aggregatedData, selectedMonths])
 
     // 2. Filter by Category
     const { categoryFilteredBreakdown, availableRegionsForCategory } = useMemo(() => {
@@ -213,8 +240,8 @@ export function TeamPerformanceClient({
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
                     권역별 실적 분석
-                    <span className={`text-[10px] font-normal px-2 py-0.5 rounded border mt-1 ${rawData.length === 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' : 'bg-white/5 text-gray-500 border-white/10'}`}>
-                        {rawData.length.toLocaleString()} rows | {availableMonths.length} months
+                    <span className={`text-[10px] font-normal px-2 py-0.5 rounded border mt-1 ${Object.keys(aggregatedData).length === 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' : 'bg-white/5 text-gray-500 border-white/10'}`}>
+                        {availableMonths.length} months
                     </span>
                 </h2>
 
@@ -247,22 +274,22 @@ export function TeamPerformanceClient({
             </div>
 
             {/* Diagnostic Alerts */}
-            {rawData.length === 0 && (
+            {Object.keys(aggregatedData).length === 0 && (
                 <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-200 text-sm flex items-start gap-3">
                     <div className="mt-0.5 p-1 rounded bg-rose-500/20">⚠️</div>
                     <div>
-                        <p className="font-bold mb-1">Raw Data 로드 실패 (0 rows)</p>
-                        <p className="text-xs opacity-80">서버에서 구글 시트 데이터를 가져오지 못했습니다. 시트 권한 설정이나 서버의 외부 네트워크 연결 상태를 확인해 주세요.</p>
+                        <p className="font-bold mb-1">데이터 로드 실패</p>
+                        <p className="text-xs opacity-80">서버에서 요약 데이터를 가져오지 못했습니다. 시트 권한 설정이나 서버 상태를 확인해 주세요.</p>
                     </div>
                 </div>
             )}
 
-            {rawData.length > 0 && availableMonths.length > 0 && Array.from(selectedMonths).every(m => !rawData.some(r => r.yearMonth === m)) && (
+            {Object.keys(aggregatedData).length > 0 && Array.from(selectedMonths).every(m => !aggregatedData[m] || aggregatedData[m].length === 0) && (
                 <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-200 text-sm flex items-start gap-3">
                     <div className="mt-0.5 p-1 rounded bg-amber-500/20">ℹ️</div>
                     <div>
                         <p className="font-bold mb-1">데이터 불일치 감지</p>
-                        <p className="text-xs opacity-80">선택된 월({Array.from(selectedMonths).join(', ')})에 해당하는 실적 데이터가 Raw Data에 존재하지 않습니다. 상단 필터에서 다른 월을 선택해 보세요.</p>
+                        <p className="text-xs opacity-80">선택된 월({Array.from(selectedMonths).join(', ')})에 해당하는 실적 데이터가 존재하지 않습니다. 상단 필터에서 다른 월을 선택해 보세요.</p>
                     </div>
                 </div>
             )}

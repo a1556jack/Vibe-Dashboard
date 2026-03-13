@@ -136,6 +136,15 @@ export interface RawDataRow {
     yearMonth: string; // "25.01"
 }
 
+export interface TeamBreakdown {
+    region: string;
+    team: string;
+    resultAmount: number;
+    normalCost: number;
+    extraCost: number;
+    workDays: number;
+}
+
 // ============================================================
 // Config
 // ============================================================
@@ -683,5 +692,53 @@ export async function fetchRawData(targetMonths?: string[]): Promise<RawDataRow[
         console.error('[sheet-data] fetchRawData error:', error);
         return [];
     }
+}
+
+export async function fetchAggregatedTeamData(targetMonths: string[]): Promise<Record<string, TeamBreakdown[]>> {
+    const rawData = await fetchRawData(targetMonths);
+    const result: Record<string, TeamBreakdown[]> = {};
+    
+    // Group raw data by month first for efficiency
+    const rowsByMonth: Record<string, RawDataRow[]> = {};
+    for (const row of rawData) {
+        if (!rowsByMonth[row.yearMonth]) rowsByMonth[row.yearMonth] = [];
+        rowsByMonth[row.yearMonth].push(row);
+    }
+
+    for (const month of targetMonths) {
+        const monthRows = rowsByMonth[month] || [];
+        const map = new Map<string, { region: string; team: string; resultAmt: number; normal: number; extra: number; dates: Set<string> }>();
+
+        monthRows.forEach(row => {
+            const teamKey = `${row.권역시공팀}|${row.시공팀}`;
+            if (!map.has(teamKey)) {
+                map.set(teamKey, { region: row.권역시공팀, team: row.시공팀, resultAmt: 0, normal: 0, extra: 0, dates: new Set() });
+            }
+            const data = map.get(teamKey)!;
+            data.resultAmt += (row.시공결과금액 || 0);
+            data.normal += row.정상시공;
+            data.extra += (row.시공외지급 || 0);
+            data.dates.add(row.시공일);
+        });
+
+        const monthBreakdown: TeamBreakdown[] = Array.from(map.values()).map(d => ({
+            region: d.region,
+            team: d.team,
+            resultAmount: d.resultAmt,
+            normalCost: d.normal,
+            extraCost: d.extra,
+            workDays: d.dates.size
+        }));
+
+        // Sort by region, then by total cost
+        monthBreakdown.sort((a, b) => {
+            if (a.region !== b.region) return a.region.localeCompare(b.region);
+            return (b.normalCost + b.extraCost) - (a.normalCost + a.extraCost);
+        });
+
+        result[month] = monthBreakdown;
+    }
+    
+    return result;
 }
 
