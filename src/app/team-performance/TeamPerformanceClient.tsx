@@ -80,6 +80,11 @@ export function TeamPerformanceClient({
     rawData: RawDataRow[],
     availableMonths: string[]
 }) {
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
     // 0. Extract all unique regions from raw data for mapping
     const allUniqueRegions = useMemo(() => {
         return Array.from(new Set(rawData.map(r => r.권역시공팀))).filter(Boolean).sort()
@@ -194,6 +199,8 @@ export function TeamPerformanceClient({
 
     const fmtCurrency = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`
     const fmtM = (v: number) => `₩${(v / 10000).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}만`
+
+    if (!mounted) return null
 
     return (
         <div className="space-y-6">
