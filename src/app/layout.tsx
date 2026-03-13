@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"; // Use default next/font i
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,7 +37,9 @@ export default function RootLayout({
 
           <Topbar />
           <div className="flex-1 overflow-y-auto p-6 scrollbar-hide relative z-0">
-            {children}
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
           </div>
         </main>
       </body>

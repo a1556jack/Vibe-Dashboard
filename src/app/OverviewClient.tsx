@@ -229,7 +229,7 @@ export function OverviewClient({
     const avgMargin = average ? average.공헌이익 : 0
 
     if (!selectedData) {
-        return <div className="flex items-center justify-center h-64 text-gray-500">데이터를 불러오는 중...</div>
+        return <div className="flex items-center justify-center h-64 text-gray-500">데이터를 선택해 주세요.</div>
     }
 
     const fmtB = (v: number) => `₩${(v / 100000000).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}억`
@@ -250,13 +250,13 @@ export function OverviewClient({
     const marginPctTrend = trendInfo(selectedData.공헌이익_pct, prevData?.공헌이익_pct ?? null)
 
     // YoY Logic
-    const yoyData = useMemo(() => {
+    const yoyData = Array.isArray(months) ? months.find(m => {
         const match = selectedMonth.match(/^(\d+)년\s*(.*)$/);
-        if (!match) return null;
+        if (!match) return false;
         const currentYear = parseInt(match[1], 10);
         const yoyMonthStr = `${currentYear - 1}년 ${match[2]}`;
-        return months.find(m => m.month === yoyMonthStr) || null;
-    }, [months, selectedMonth]);
+        return m.month === yoyMonthStr;
+    }) : null;
 
     const revYoyTrend = trendInfo(selectedData.용역수입.합계, yoyData?.용역수입.합계 ?? null);
     const costYoyTrend = trendInfo(selectedData.변동비.합계, yoyData?.변동비.합계 ?? null);
@@ -265,8 +265,6 @@ export function OverviewClient({
     const revAvgTrend = trendInfo(selectedData.용역수입.합계, average?.용역수입.합계 ?? null);
     const costAvgTrend = trendInfo(selectedData.변동비.합계, average?.변동비.합계 ?? null);
     const marginAvgTrend = trendInfo(selectedData.공헌이익, average?.공헌이익 ?? null);
-
-    if (!mounted) return null
 
     return (
         <div className="space-y-6">
@@ -370,25 +368,29 @@ export function OverviewClient({
             <div className="grid gap-6 lg:grid-cols-[65%_1fr]">
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 backdrop-blur-sm shadow-sm h-[400px]">
                     <h3 className="mb-2 text-lg font-semibold text-white">월별 추이 (점선: 25년 평균)</h3>
-                    <ResponsiveContainer width="100%" height="90%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} /><stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} /></linearGradient>
-                                <linearGradient id="marginGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                            <XAxis dataKey="month" stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} />
-                            <YAxis stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} tickFormatter={(v) => `${(v / 100000000).toFixed(0)}억`} />
-                            <Tooltip contentStyle={{ backgroundColor: 'rgba(20,20,23,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: 12 }} formatter={(value: any, name: any) => [`₩${Number(value).toLocaleString()}`, name]} />
-                            <Legend wrapperStyle={{ color: '#a1a1aa', fontSize: 12 }} />
-                            {avgRevenue > 0 && <ReferenceLine y={avgRevenue} stroke="#8b5cf6" strokeDasharray="6 4" strokeOpacity={0.7} label={{ value: `용역수입 평균 ${fmtM(avgRevenue)}`, position: 'insideTopRight', fill: '#8b5cf690', fontSize: 10 }} />}
-                            {avgCost > 0 && <ReferenceLine y={avgCost} stroke="#f43f5e" strokeDasharray="6 4" strokeOpacity={0.7} label={{ value: `변동비 평균 ${fmtM(avgCost)}`, position: 'insideTopRight', fill: '#f43f5e90', fontSize: 10 }} />}
-                            {avgMargin > 0 && <ReferenceLine y={avgMargin} stroke="#10b981" strokeDasharray="6 4" strokeOpacity={0.7} label={{ value: `공헌이익 평균 ${fmtM(avgMargin)}`, position: 'insideBottomRight', fill: '#10b98190', fontSize: 10 }} />}
-                            <Area name="용역수입" type="monotone" dataKey="용역수입" stroke="#8b5cf6" strokeWidth={2} fill="url(#revGrad)" dot={{ fill: '#8b5cf6', r: 3 }} activeDot={{ r: 6 }} />
-                            <Area name="변동비" type="monotone" dataKey="변동비" stroke="#f43f5e" strokeWidth={2} fill="none" dot={{ fill: '#f43f5e', r: 3 }} activeDot={{ r: 6 }} />
-                            <Area name="공헌이익" type="monotone" dataKey="공헌이익" stroke="#10b981" strokeWidth={2} fill="url(#marginGrad)" dot={{ fill: '#10b981', r: 3 }} activeDot={{ r: 6 }} />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    {mounted ? (
+                        <ResponsiveContainer width="100%" height="90%">
+                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} /><stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} /></linearGradient>
+                                    <linearGradient id="marginGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                <XAxis dataKey="month" stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} />
+                                <YAxis stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} tickFormatter={(v) => `${(v / 100000000).toFixed(0)}억`} />
+                                <Tooltip contentStyle={{ backgroundColor: 'rgba(20,20,23,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: 12 }} formatter={(value: any, name: any) => [`₩${Number(value).toLocaleString()}`, name]} />
+                                <Legend wrapperStyle={{ color: '#a1a1aa', fontSize: 12 }} />
+                                {avgRevenue > 0 && <ReferenceLine y={avgRevenue} stroke="#8b5cf6" strokeDasharray="6 4" strokeOpacity={0.7} label={{ value: `용역수입 평균 ${fmtM(avgRevenue)}`, position: 'insideTopRight', fill: '#8b5cf690', fontSize: 10 }} />}
+                                {avgCost > 0 && <ReferenceLine y={avgCost} stroke="#f43f5e" strokeDasharray="6 4" strokeOpacity={0.7} label={{ value: `변동비 평균 ${fmtM(avgCost)}`, position: 'insideTopRight', fill: '#f43f5e90', fontSize: 10 }} />}
+                                {avgMargin > 0 && <ReferenceLine y={avgMargin} stroke="#10b981" strokeDasharray="6 4" strokeOpacity={0.7} label={{ value: `공헌이익 평균 ${fmtM(avgMargin)}`, position: 'insideBottomRight', fill: '#10b98190', fontSize: 10 }} />}
+                                <Area name="용역수입" type="monotone" dataKey="용역수입" stroke="#8b5cf6" strokeWidth={2} fill="url(#revGrad)" dot={{ fill: '#8b5cf6', r: 3 }} activeDot={{ r: 6 }} />
+                                <Area name="변동비" type="monotone" dataKey="변동비" stroke="#f43f5e" strokeWidth={2} fill="none" dot={{ fill: '#f43f5e', r: 3 }} activeDot={{ r: 6 }} />
+                                <Area name="공헌이익" type="monotone" dataKey="공헌이익" stroke="#10b981" strokeWidth={2} fill="url(#marginGrad)" dot={{ fill: '#10b981', r: 3 }} activeDot={{ r: 6 }} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="w-full h-[90%] flex items-center justify-center bg-white/5 rounded-lg animate-pulse" />
+                    )}
                 </motion.div>
 
                 {/* Right side: Auto Analysis Report Area */}

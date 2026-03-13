@@ -95,7 +95,14 @@ export function TeamPerformanceClient({
     const jochiRegions = useMemo(() => allUniqueRegions.filter(r => !r.startsWith('H') && !r.startsWith('F')), [allUniqueRegions])
 
     // Set default month to the latest available month
-    const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set([availableMonths[availableMonths.length - 1] || ""]))
+    const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set())
+    
+    useEffect(() => {
+        if (availableMonths.length > 0 && selectedMonths.size === 0) {
+            setSelectedMonths(new Set([availableMonths[availableMonths.length - 1]]))
+        }
+    }, [availableMonths, selectedMonths.size])
+
     const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("ALL")
     const [checkedRegions, setCheckedRegions] = useState<Set<string>>(new Set())
 
@@ -200,7 +207,6 @@ export function TeamPerformanceClient({
     const fmtCurrency = (v: number) => `₩${Math.round(v).toLocaleString('ko-KR')}`
     const fmtM = (v: number) => `₩${(v / 10000).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}만`
 
-    if (!mounted) return null
 
     return (
         <div className="space-y-6">
@@ -275,24 +281,28 @@ export function TeamPerformanceClient({
                 </div>
                 <div className="h-[350px] w-full relative">
                     {/* Fixed height container for Recharts stability */}
-                    <ResponsiveContainer width="99%" height="99%" key={regionSummaryData.length}>
-                        <BarChart data={regionSummaryData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                            <XAxis dataKey="region" stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} />
-                            <YAxis stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                    {mounted ? (
+                        <ResponsiveContainer width="99%" height="99%" key={regionSummaryData.length}>
+                            <BarChart data={regionSummaryData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                <XAxis dataKey="region" stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} />
+                                <YAxis stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
 
-                            <Tooltip
-                                cursor={{ fill: 'rgba(255,255,255,0.02)' }}
-                                contentStyle={{ backgroundColor: 'rgba(20,20,23,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }}
-                                formatter={(value: any, name: any) => [fmtCurrency(Number(value)), name]}
-                            />
-                            <Legend wrapperStyle={{ color: '#a1a1aa', fontSize: 12, paddingTop: '10px' }} />
+                                <Tooltip
+                                    cursor={{ fill: 'rgba(255,255,255,0.02)' }}
+                                    contentStyle={{ backgroundColor: 'rgba(20,20,23,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }}
+                                    formatter={(value: any, name: any) => [fmtCurrency(Number(value)), name]}
+                                />
+                                <Legend wrapperStyle={{ color: '#a1a1aa', fontSize: 12, paddingTop: '10px' }} />
 
-                            <Bar name="평균 전체시공비" dataKey="avgTotal" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} />
-                            <Bar name="평균 정상시공비" dataKey="avgNormal" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
-                            <Bar name="평균 기타시공비" dataKey="avgExtra" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                                <Bar name="평균 전체시공비" dataKey="avgTotal" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Bar name="평균 정상시공비" dataKey="avgNormal" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Bar name="평균 기타시공비" dataKey="avgExtra" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-white/5 rounded-lg animate-pulse" />
+                    )}
                 </div>
             </motion.div>
 
