@@ -597,7 +597,7 @@ export async function fetchTravelSupportData(): Promise<TravelSupportData[]> {
 // 7. RAW DATA
 // ============================================================
 
-export async function fetchRawData(): Promise<RawDataRow[]> {
+export async function fetchRawData(targetMonths?: string[]): Promise<RawDataRow[]> {
     try {
         // Fetch in smaller batches to avoid overwhelming the connection / timeout
         let allRows: string[][] = [];
@@ -617,6 +617,8 @@ export async function fetchRawData(): Promise<RawDataRow[]> {
 
         console.log(`[sheet-data] Total raw rows to process: ${allRows.length}`);
         const result: RawDataRow[] = [];
+        const monthSet = targetMonths ? new Set(targetMonths) : null;
+
         for (let i = 0; i < allRows.length; i++) {
             const row = allRows[i];
             // Skip header rows by checking if date column looks like a date
@@ -629,6 +631,9 @@ export async function fetchRawData(): Promise<RawDataRow[]> {
             if (match) {
                 yearMonth = `${match[1].slice(2)}.${match[2]}`; // "2025-01" -> "25.01", "2026-01" -> "26.01"
             }
+
+            // FILTERING: Only include if month is in target list (if provided)
+            if (monthSet && !monthSet.has(yearMonth)) continue;
 
             result.push({
                 서비스센터: row[0]?.trim(),
