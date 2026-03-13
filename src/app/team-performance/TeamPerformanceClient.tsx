@@ -7,10 +7,7 @@ import { ChevronDown, CheckSquare, Square } from "lucide-react"
 import { generateTeamBreakdown } from "@/lib/analysis-engine"
 import type { RawDataRow } from "@/lib/sheet-data"
 
-const HYUNJANG_REGIONS = ["HA01전남성", "HB01안동준", "HC01박승훈", "HD01김태영", "HE01궉상우"]
-const SOAEK_REGIONS = ["FA01김현섭", "FB17이정일", "FC19신승현", "FD25손대만", "FE30김정훈", "FF34김용훈", "FI50이현석"]
-
-type CategoryFilter = "ALL" | "현장" | "소액"
+type CategoryFilter = "ALL" | "현장" | "소액" | "조치"
 
 function MultiSelectDropdown({
     label,
@@ -83,9 +80,26 @@ export function TeamPerformanceClient({
     rawData: RawDataRow[],
     availableMonths: string[]
 }) {
-    const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set([availableMonths[0] || ""]))
+    // 0. Extract all unique regions from raw data for mapping
+    const allUniqueRegions = useMemo(() => {
+        return Array.from(new Set(rawData.map(r => r.권역시공팀))).filter(Boolean).sort()
+    }, [rawData])
+
+    const hyunjangRegions = useMemo(() => allUniqueRegions.filter(r => r.startsWith('H')), [allUniqueRegions])
+    const soaekRegions = useMemo(() => allUniqueRegions.filter(r => r.startsWith('F')), [allUniqueRegions])
+    const jochiRegions = useMemo(() => allUniqueRegions.filter(r => !r.startsWith('H') && !r.startsWith('F')), [allUniqueRegions])
+
+    // Set default month to the latest available month
+    const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set([availableMonths[availableMonths.length - 1] || ""]))
     const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("ALL")
     const [checkedRegions, setCheckedRegions] = useState<Set<string>>(new Set())
+
+    // Synchronize selectedMonths when availableMonths changes (Hydration fix)
+    useEffect(() => {
+        if (availableMonths.length > 0 && Array.from(selectedMonths).every(m => m === "" || !availableMonths.includes(m))) {
+            setSelectedMonths(new Set([availableMonths[availableMonths.length - 1]]));
+        }
+    }, [availableMonths, selectedMonths])
 
     const handleMonthToggle = (m: string) => {
         setSelectedMonths(prev => {
@@ -117,15 +131,16 @@ export function TeamPerformanceClient({
     // 2. Filter by Category
     const { categoryFilteredBreakdown, availableRegionsForCategory } = useMemo(() => {
         let validRegions: string[] = []
-        if (selectedCategory === "현장") validRegions = HYUNJANG_REGIONS
-        else if (selectedCategory === "소액") validRegions = SOAEK_REGIONS
-        else validRegions = [...HYUNJANG_REGIONS, ...SOAEK_REGIONS]
+        if (selectedCategory === "현장") validRegions = hyunjangRegions
+        else if (selectedCategory === "소액") validRegions = soaekRegions
+        else if (selectedCategory === "조치") validRegions = jochiRegions
+        else validRegions = allUniqueRegions
 
         const filtered = allBreakdown.filter(r => validRegions.includes(r.region))
         const activeRegions = Array.from(new Set(filtered.map(r => r.region))).sort()
 
         return { categoryFilteredBreakdown: filtered, availableRegionsForCategory: activeRegions }
-    }, [allBreakdown, selectedCategory])
+    }, [allBreakdown, selectedCategory, hyunjangRegions, soaekRegions, jochiRegions, allUniqueRegions])
 
     // Update checked regions when category changes
     useEffect(() => {
@@ -183,7 +198,12 @@ export function TeamPerformanceClient({
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h2 className="text-2xl font-bold text-white tracking-tight">권역별 실적 분석</h2>
+                <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+                    권역별 실적 분석
+                    <span className={`text-[10px] font-normal px-2 py-0.5 rounded border mt-1 ${rawData.length === 0 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' : 'bg-white/5 text-gray-500 border-white/10'}`}>
+                        {rawData.length.toLocaleString()} rows | {availableMonths.length} months
+                    </span>
+                </h2>
 
                 <div className="flex flex-wrap items-center gap-3">
                     <MultiSelectDropdown
@@ -201,6 +221,7 @@ export function TeamPerformanceClient({
                         <option value="ALL" className="bg-[#1a1a24]">전체 그룹</option>
                         <option value="현장" className="bg-[#1a1a24]">경인 현장</option>
                         <option value="소액" className="bg-[#1a1a24]">경인 소액</option>
+                        <option value="조치" className="bg-[#1a1a24]">조치/기타</option>
                     </select>
 
                     <MultiSelectDropdown
@@ -211,6 +232,27 @@ export function TeamPerformanceClient({
                     />
                 </div>
             </div>
+
+            {/* Diagnostic Alerts */}
+            {rawData.length === 0 && (
+                <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-200 text-sm flex items-start gap-3">
+                    <div className="mt-0.5 p-1 rounded bg-rose-500/20">⚠️</div>
+                    <div>
+                        <p className="font-bold mb-1">Raw Data 로드 실패 (0 rows)</p>
+                        <p className="text-xs opacity-80">서버에서 구글 시트 데이터를 가져오지 못했습니다. 시트 권한 설정이나 서버의 외부 네트워크 연결 상태를 확인해 주세요.</p>
+                    </div>
+                </div>
+            )}
+
+            {rawData.length > 0 && availableMonths.length > 0 && Array.from(selectedMonths).every(m => !rawData.some(r => r.yearMonth === m)) && (
+                <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-200 text-sm flex items-start gap-3">
+                    <div className="mt-0.5 p-1 rounded bg-amber-500/20">ℹ️</div>
+                    <div>
+                        <p className="font-bold mb-1">데이터 불일치 감지</p>
+                        <p className="text-xs opacity-80">선택된 월({Array.from(selectedMonths).join(', ')})에 해당하는 실적 데이터가 Raw Data에 존재하지 않습니다. 상단 필터에서 다른 월을 선택해 보세요.</p>
+                    </div>
+                </div>
+            )}
 
             {/* Region Averages Chart */}
             <motion.div
@@ -224,8 +266,9 @@ export function TeamPerformanceClient({
                         <span className="text-xs font-normal text-gray-500 bg-gray-500/10 px-2 py-0.5 rounded-full border border-gray-500/20">대분류 그룹 필터만 적용</span>
                     </h3>
                 </div>
-                <div className="h-[350px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="h-[350px] w-full relative">
+                    {/* Fixed height container for Recharts stability */}
+                    <ResponsiveContainer width="99%" height="99%" key={regionSummaryData.length}>
                         <BarChart data={regionSummaryData} margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                             <XAxis dataKey="region" stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} />

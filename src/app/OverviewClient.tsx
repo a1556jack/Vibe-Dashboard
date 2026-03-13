@@ -137,7 +137,7 @@ export function OverviewClient({
     equipAvg,
     capData,
     travelData,
-    rawData
+    rawDataPromise
 }: {
     months: FinancialMonthData[]
     average: FinancialMonthData | null
@@ -147,8 +147,20 @@ export function OverviewClient({
     equipAvg: EquipmentCostData | null
     capData: NightworkCapData[]
     travelData: TravelSupportData[]
-    rawData: RawDataRow[]
+    rawDataPromise: Promise<RawDataRow[]>
 }) {
+    const [rawData, setRawData] = useState<RawDataRow[]>([])
+    const [isRawDataLoading, setIsRawDataLoading] = useState(true)
+
+    useEffect(() => {
+        rawDataPromise.then(data => {
+            setRawData(data)
+            setIsRawDataLoading(false)
+        }).catch(err => {
+            console.error("Failed to load raw data:", err)
+            setIsRawDataLoading(false)
+        })
+    }, [rawDataPromise])
     const rawDataMonths = useMemo(() => {
         const set = new Set(rawData.map(r => r.yearMonth).filter(Boolean));
         return Array.from(set).sort((a, b) => b.localeCompare(a));
@@ -156,16 +168,23 @@ export function OverviewClient({
 
     const [selectedMonth, setSelectedMonth] = useState<string>(months.length > 0 ? months[months.length - 1].month : '')
     const [showMonthDropdown, setShowMonthDropdown] = useState(false)
-    const [insightMonth, setInsightMonth] = useState<string>(rawDataMonths.length > 0 ? rawDataMonths[0] : (months.length > 0 ? months[months.length - 1].month : ''))
+    const [insightMonth, setInsightMonth] = useState<string>('')
     const [showInsightDropdown, setShowInsightDropdown] = useState(false)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
 
+    // Set initial insight month when rawData arrives or component mounts
+    useEffect(() => {
+        if (rawDataMonths.length > 0 && !insightMonth) {
+            setInsightMonth(rawDataMonths[0])
+        } else if (months.length > 0 && !insightMonth) {
+            setInsightMonth(months[months.length - 1].month)
+        }
+    }, [rawDataMonths, months, insightMonth])
+
     const selectedData = useMemo(() => months.find(m => m.month === selectedMonth), [months, selectedMonth])
     const selectedIdx = useMemo(() => months.findIndex(m => m.month === selectedMonth), [months, selectedMonth])
     const prevData = useMemo(() => selectedIdx > 0 ? months[selectedIdx - 1] : null, [months, selectedIdx])
-
-
 
     // Clear report on month change
     useEffect(() => {
@@ -173,6 +192,7 @@ export function OverviewClient({
     }, [selectedMonth, insightMonth])
 
     const handleAnalyze = () => {
+        if (isRawDataLoading) return;
         setIsAnalyzing(true)
         // simulate a small delay for engine thinking
         setTimeout(() => {
@@ -276,7 +296,7 @@ export function OverviewClient({
 
             {/* Top section: 2x2 grid for KPIs and Chart/Report side by side */}
             <div className="flex flex-col xl:flex-row gap-6">
-                
+
                 {/* Left side: 2x2 KPIs */}
                 <div className="w-full xl:w-1/2">
                     <div className="grid gap-4 grid-cols-2">
@@ -292,7 +312,7 @@ export function OverviewClient({
                     <div className="h-full rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 backdrop-blur-sm shadow-sm flex flex-col justify-center">
                         <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
                             <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                                <Sparkles className="h-4 w-4 text-indigo-400"/>
+                                <Sparkles className="h-4 w-4 text-indigo-400" />
                                 종합 다중 비교 분석 <span className="text-gray-400 text-xs font-normal">({selectedMonth} 기준)</span>
                             </h3>
                         </div>
@@ -406,10 +426,11 @@ export function OverviewClient({
                             </div>
                             <button
                                 onClick={handleAnalyze}
-                                disabled={isAnalyzing}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${isAnalyzing ? 'bg-indigo-500/50 text-white cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'}`}
+                                disabled={isAnalyzing || isRawDataLoading}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${isAnalyzing || isRawDataLoading ? 'bg-indigo-500/50 text-white cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'}`}
                             >
-                                {isAnalyzing ? <><Loader2 className="h-4 w-4 animate-spin" /> 분석 중...</> : '분석 실행'}
+                                {isAnalyzing ? <><Loader2 className="h-4 w-4 animate-spin" /> 분석 중...</> : 
+                                 isRawDataLoading ? <><Loader2 className="h-4 w-4 animate-spin" /> 데이터 로딩 중...</> : '분석 실행'}
                             </button>
                         </div>
                     </div>

@@ -14,16 +14,18 @@ import { OverviewClient } from "./OverviewClient"
 export default async function OverviewPage() {
   const [
     finRes, billingData, nightRatioData,
-    equipRes, capData, travelData, rawData
+    equipRes, capData, travelData
   ] = await Promise.all([
     fetchFinancialDetailData(),
     fetchBillingData(),
     fetchNightworkRatioData(),
     fetchEquipmentCostData(),
     fetchNightworkCapData(),
-    fetchTravelSupportData(),
-    fetchRawData()
+    fetchTravelSupportData()
   ]);
+
+  // Start raw data fetch but don't await it here to avoid blocking page render
+  const rawDataPromise = fetchRawData();
 
   return <OverviewClient
     months={finRes.months}
@@ -34,6 +36,6 @@ export default async function OverviewPage() {
     equipAvg={equipRes.average}
     capData={capData}
     travelData={travelData}
-    rawData={rawData}
+    rawDataPromise={rawDataPromise}
   />
 }

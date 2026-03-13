@@ -152,8 +152,8 @@ function sheetUrl(sheetName: string): string {
 // Generic CSV Fetcher
 // ============================================================
 
-// 15-second timeout for fetch to handle many concurrent sheets
-async function fetchWithTimeout(url: string, options: any = {}, timeout = 15000) {
+// 60-second timeout for fetch to handle many concurrent sheets or slow Google response
+async function fetchWithTimeout(url: string, options: any = {}, timeout = 60000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     try {
@@ -163,8 +163,11 @@ async function fetchWithTimeout(url: string, options: any = {}, timeout = 15000)
         });
         clearTimeout(id);
         return response;
-    } catch (error) {
+    } catch (error: any) {
         clearTimeout(id);
+        if (error.name === 'AbortError') {
+            console.error(`[sheet-data] Fetch timed out for URL: ${url.substring(0, 100)}...`);
+        }
         throw error;
     }
 }
@@ -173,8 +176,7 @@ async function fetchCSV(url: string): Promise<string[][]> {
     try {
         console.log(`[sheet-data] Fetching: ${url.substring(0, 100)}...`);
         const response = await fetchWithTimeout(url, {
-            next: { revalidate: 300 },
-            cache: 'no-store' // Bypass cache for debugging
+            cache: 'no-store', // Bypass cache to ensure we get fresh data on deployment
         });
 
         if (!response.ok) {
@@ -184,11 +186,11 @@ async function fetchCSV(url: string): Promise<string[][]> {
 
         const csvText = await response.text();
         if (!csvText || csvText.length < 10) {
-            console.error('[sheet-data] Empty response text');
+            console.error(`[sheet-data] Empty response text from: ${url.substring(0, 100)}`);
             return [];
         }
 
-        return new Promise((resolve, reject) => {
+        const parsed = await new Promise<string[][]>((resolve, reject) => {
             Papa.parse(csvText, {
                 header: false,
                 skipEmptyLines: true,
@@ -201,8 +203,10 @@ async function fetchCSV(url: string): Promise<string[][]> {
                 },
             });
         });
+        console.log(`[sheet-data] Fetched ${parsed.length} rows from: ${url.substring(0, 100)}`);
+        return parsed;
     } catch (error) {
-        console.error('[sheet-data] Fetch error:', error);
+        console.error(`[sheet-data] Fetch error for ${url}:`, error);
         return [];
     }
 }
@@ -219,7 +223,10 @@ const RAW_DATA_URLS = [
 
 function parseNum(val: string | undefined): number {
     if (!val) return 0;
-    return parseFloat(val.replace(/,/g, '').replace(/"/g, '').replace(/%/g, ''));
+    const str = val.replace(/,/g, '').replace(/"/g, '').replace(/%/g, '').trim();
+    if (!str) return 0;
+    const n = parseFloat(str);
+    return isNaN(n) ? 0 : n;
 }
 
 function parsePercent(val: string | undefined): number {
@@ -593,17 +600,22 @@ export async function fetchTravelSupportData(): Promise<TravelSupportData[]> {
 export async function fetchRawData(): Promise<RawDataRow[]> {
     try {
         // Fetch in smaller batches to avoid overwhelming the connection / timeout
-        const results: string[][] = [];
+        let allRows: string[][] = [];
         const batchSize = 4;
         for (let i = 0; i < RAW_DATA_URLS.length; i += batchSize) {
             const batchUrls = RAW_DATA_URLS.slice(i, i + batchSize);
             const batchResults = await Promise.all(batchUrls.map(url => fetchCSV(url)));
-            batchResults.forEach(res => results.push(...res));
+            for (const res of batchResults) {
+                allRows = allRows.concat(res);
+            }
         }
 
-        const allRows = results.flat();
-        if (allRows.length < 3) return [];
+        if (allRows.length < 3) {
+            console.error('[sheet-data] No raw data rows found after fetching all URLs');
+            return [];
+        }
 
+        console.log(`[sheet-data] Total raw rows to process: ${allRows.length}`);
         const result: RawDataRow[] = [];
         for (let i = 0; i < allRows.length; i++) {
             const row = allRows[i];
