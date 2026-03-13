@@ -235,7 +235,7 @@ function parsePercent(val: string | undefined): number {
     return parseFloat(str) || 0;
 }
 
-function formatMonth(raw: string): string {
+export function formatMonth(raw: string): string {
     const match = raw.match(/(\d+)년\s*(\d+)월/);
     if (match) {
         const year = match[1].length === 4 ? match[1].slice(2) : match[1];
@@ -617,7 +617,7 @@ export async function fetchRawData(targetMonths?: string[]): Promise<RawDataRow[
 
         console.log(`[sheet-data] Total raw rows to process: ${allRows.length}`);
         const result: RawDataRow[] = [];
-        const monthSet = targetMonths ? new Set(targetMonths) : null;
+        const monthSet = targetMonths ? new Set(targetMonths.map(m => formatMonth(m))) : null;
 
         for (let i = 0; i < allRows.length; i++) {
             const row = allRows[i];

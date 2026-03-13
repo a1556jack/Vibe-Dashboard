@@ -5,7 +5,8 @@ import {
     EquipmentCostData,
     NightworkCapData,
     TravelSupportData,
-    RawDataRow
+    RawDataRow,
+    formatMonth
 } from './sheet-data';
 
 export interface InsightCard {
@@ -50,6 +51,9 @@ export function generateAnalysisReport(
     travelData: TravelSupportData[],
     rawData: RawDataRow[]
 ): AnalysisResult {
+    const selM = formatMonth(selectedMonth);
+    const insM = formatMonth(insightMonth);
+
     // 1. Find Data for Selected Month and Previous Month
     const currFinIdx = finDataList.findIndex(d => d.month === selectedMonth);
     const currFin = currFinIdx >= 0 ? finDataList[currFinIdx] : null;
@@ -116,7 +120,7 @@ export function generateAnalysisReport(
                 narrative.push(`심야 시공의 전체 비율은 전월(${prevCap.month})과 유사하거나 하락했음에도 불구하고, 심야 지급 상한 기준 초과로 인한 지출(변동비)은 ${formatMil(Math.abs(capDiff))}백만원 증가했습니다.`);
 
                 // Try to find the specific project that caused it
-                const currentMonthRaw = rawData.filter(r => r.yearMonth === selectedMonth);
+                const currentMonthRaw = rawData.filter(r => r.yearMonth === selM);
                 const heavyNightTickets = currentMonthRaw.filter(r => {
                     const nightSum = r.주중야간 + r.주중심야 + r.주말야간 + r.주말심야;
                     return nightSum >= 500000; // Look for tickets with high night-specific costs
@@ -262,7 +266,7 @@ export function generateAnalysisReport(
     }
 
     // Insight 1: Equipment Ratio vs Average
-    const currEquipInsight = equipData.find(d => d.month === insightMonth);
+    const currEquipInsight = equipData.find(d => d.month === insM);
     if (currEquipInsight && equipAvg) {
         const currEqRatio = currEquipInsight.장비비율_전체 * 100;
         const avgEqRatio = equipAvg.장비비율_전체 * 100;
@@ -422,7 +426,7 @@ export interface TeamBreakdown {
 }
 
 export function generateTeamBreakdown(rawData: RawDataRow[], selectedMonths: string | string[]): TeamBreakdown[] {
-    const monthsArray = Array.isArray(selectedMonths) ? selectedMonths : [selectedMonths];
+    const monthsArray = (Array.isArray(selectedMonths) ? selectedMonths : [selectedMonths]).map(m => formatMonth(m));
     const monthData = rawData.filter(r => monthsArray.includes(r.yearMonth));
     const map = new Map<string, { region: string; team: string; resultAmt: number; normal: number; extra: number; dates: Set<string> }>();
 
