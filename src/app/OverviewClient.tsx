@@ -149,8 +149,13 @@ export function OverviewClient({
     travelData: TravelSupportData[]
     rawDataPromise: Promise<RawDataRow[]>
 }) {
+    const [mounted, setMounted] = useState(false)
     const [rawData, setRawData] = useState<RawDataRow[]>([])
     const [isRawDataLoading, setIsRawDataLoading] = useState(true)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     useEffect(() => {
         rawDataPromise.then(data => {
@@ -260,6 +265,8 @@ export function OverviewClient({
     const revAvgTrend = trendInfo(selectedData.용역수입.합계, average?.용역수입.합계 ?? null);
     const costAvgTrend = trendInfo(selectedData.변동비.합계, average?.변동비.합계 ?? null);
     const marginAvgTrend = trendInfo(selectedData.공헌이익, average?.공헌이익 ?? null);
+
+    if (!mounted) return null
 
     return (
         <div className="space-y-6">

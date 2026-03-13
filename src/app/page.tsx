@@ -24,8 +24,9 @@ export default async function OverviewPage() {
     fetchTravelSupportData()
   ]);
 
-  // Start raw data fetch but don't await it here to avoid blocking page render
-  const rawDataPromise = fetchRawData();
+  const targetMonths = finRes.months.map(m => m.month);
+  // Start filtered raw data fetch
+  const rawDataPromise = fetchRawData(targetMonths);
 
   return <OverviewClient
     months={finRes.months}
