@@ -52,6 +52,13 @@ export interface NightworkRatioData {
     totalAmount: number;
     nightworkAmount: number;
     nightworkRatio: number;
+    // Expanded sub-categories
+    hyunjangTotal?: number;
+    hyunjangNight?: number;
+    hyunjangRatio?: number;
+    soaekTotal?: number;
+    soaekNight?: number;
+    soaekRatio?: number;
 }
 
 export interface EquipmentCostData {
@@ -431,25 +438,47 @@ export async function fetchNightworkRatioData(): Promise<NightworkRatioData[]> {
         const rows = await fetchCSV(sheetUrl('경인 퍼시스 심야 시공 비율'));
         if (rows.length < 4) return [];
 
-        // Row 0: headers ["","","","2025년 1월",...]
-        // Row 1: 전체_시공결과금액
-        // Row 2: 심야시공_시공결과금액
-        // Row 3: 심야시공_금액비율(%)
-
         const headerRow = rows[0];
-        const totalRow = rows[1];
-        const nightRow = rows[2];
-        const ratioRow = rows[3];
+        
+        // Find row indices by label (searching ANY column for robustness)
+        const findRowIdx = (label: string) => rows.findIndex(r => r.some(c => c?.trim() === label));
+        
+        const idxTotal = findRowIdx('경인_통합');
+        const idxHyunjang = findRowIdx('경인_현장');
+        const idxSoaek = findRowIdx('경인_소액');
+        
+        const getGroupRows = (startIdx: number) => {
+            if (startIdx === -1) return null;
+            return {
+                total: rows[startIdx],
+                night: rows[startIdx + 1],
+                ratio: rows[startIdx + 2]
+            };
+        };
+
+        const totalRows = getGroupRows(idxTotal);
+        const hyunjangRows = getGroupRows(idxHyunjang);
+        const soaekRows = getGroupRows(idxSoaek);
 
         const result: NightworkRatioData[] = [];
+        
         for (let i = 3; i < headerRow.length; i++) {
             const monthRaw = headerRow[i]?.trim();
-            if (!monthRaw) continue;
+            if (!monthRaw || monthRaw.length < 3) continue; 
+            
+            const month = formatMonth(monthRaw);
+
             result.push({
-                month: formatMonth(monthRaw),
-                totalAmount: parseNum(totalRow[i]),
-                nightworkAmount: parseNum(nightRow[i]),
-                nightworkRatio: parsePercent(ratioRow[i]),
+                month,
+                totalAmount: totalRows ? parseNum(totalRows.total[i]) : 0,
+                nightworkAmount: totalRows ? parseNum(totalRows.night[i]) : 0,
+                nightworkRatio: totalRows ? parsePercent(totalRows.ratio[i]) : 0,
+                hyunjangTotal: hyunjangRows ? parseNum(hyunjangRows.total[i]) : 0,
+                hyunjangNight: hyunjangRows ? parseNum(hyunjangRows.night[i]) : 0,
+                hyunjangRatio: hyunjangRows ? parsePercent(hyunjangRows.ratio[i]) : 0,
+                soaekTotal: soaekRows ? parseNum(soaekRows.total[i]) : 0,
+                soaekNight: soaekRows ? parseNum(soaekRows.night[i]) : 0,
+                soaekRatio: soaekRows ? parsePercent(soaekRows.ratio[i]) : 0,
             });
         }
         return result;

@@ -6,7 +6,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGri
 import { ChevronDown, CheckSquare, Square } from "lucide-react"
 import type { TeamBreakdown } from "@/lib/sheet-data"
 
-type CategoryFilter = "ALL" | "현장" | "소액" | "조치"
+type CategoryFilter = "ALL" | "현장" | "소액"
 
 function MultiSelectDropdown({
     label,
@@ -87,7 +87,9 @@ export function TeamPerformanceClient({
     // 0. Extract all unique regions from aggregated data for mapping
     const allUniqueRegions = useMemo(() => {
         const allBreakdowns = Object.values(aggregatedData).flat();
-        return Array.from(new Set(allBreakdowns.map(r => r.region))).filter(Boolean).sort()
+        return Array.from(new Set(allBreakdowns.map(r => r.region)))
+            .filter(r => r && (r.startsWith('H') || r.startsWith('F')))
+            .sort()
     }, [aggregatedData])
 
     const hyunjangRegions = useMemo(() => allUniqueRegions.filter(r => r.startsWith('H')), [allUniqueRegions])
@@ -172,7 +174,6 @@ export function TeamPerformanceClient({
         let validRegions: string[] = []
         if (selectedCategory === "현장") validRegions = hyunjangRegions
         else if (selectedCategory === "소액") validRegions = soaekRegions
-        else if (selectedCategory === "조치") validRegions = jochiRegions
         else validRegions = allUniqueRegions
 
         const filtered = allBreakdown.filter(r => validRegions.includes(r.region))
@@ -261,7 +262,6 @@ export function TeamPerformanceClient({
                         <option value="ALL" className="bg-[#1a1a24]">전체 그룹</option>
                         <option value="현장" className="bg-[#1a1a24]">경인 현장</option>
                         <option value="소액" className="bg-[#1a1a24]">경인 소액</option>
-                        <option value="조치" className="bg-[#1a1a24]">조치/기타</option>
                     </select>
 
                     <MultiSelectDropdown

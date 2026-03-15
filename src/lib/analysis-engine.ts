@@ -135,7 +135,7 @@ export function generateAnalysisReport(
                     narrative.push(`이는 주로 특정 야간/심야 고비용 프로젝트 건(${names})의 영향이 크게 작용한 결과로 분석됩니다.`);
                 }
             } else if (ratioDiff > 0.02 && capDiff > 0) {
-                narrative.push(`심야 시공 비율 자체가 전월(${prevCap.month})보다 ${(ratioDiff * 100).toFixed(1)}%p 크게 늘어남에 따라, 지급 상한 공제 시공비 규모 역시 자연스럽게 동반 상승했습니다.`);
+                narrative.push(`심야 시공 비율 자체가 전월(${prevCap.month})보다 ${ratioDiff.toFixed(1)}%p 크게 늘어남에 따라, 지급 상한 공제 시공비 규모 역시 자연스럽게 동반 상승했습니다.`);
             } else if (capDiff > 0 && capDiff <= 1000000) {
                 narrative.push(`상한 지급을 초과한 심야 추가 시공비 규모는 전월(${prevCap.month}) 대비 ${formatMil(Math.abs(capDiff))}백만원 증가하며 비교적 유사한 수준을 보였습니다.`);
             } else if (capDiff < 0) {
@@ -347,8 +347,8 @@ export function generateAnalysisReport(
     // Insight 3: Nightwork ratio risk (+2.0%p)
     const currNightRatioInsight = nightRatioData.find(d => d.month === insightMonth);
     if (currNightRatioInsight) {
-        const cNightPct = currNightRatioInsight.nightworkRatio * 100;
-        const aNightPct = avgNightRatio * 100;
+        const cNightPct = currNightRatioInsight.nightworkRatio;
+        const aNightPct = avgNightRatio;
         if (cNightPct - aNightPct >= 2.0) {
             insights.push({
                 title: '과도한 심야 시공 비율 감지',

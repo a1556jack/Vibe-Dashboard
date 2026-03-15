@@ -182,6 +182,16 @@ export function OverviewClient({
     const [showInsightDropdown, setShowInsightDropdown] = useState(false)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+
+    const toggleRow = (rowId: string) => {
+        setExpandedRows(prev => {
+            const next = new Set(prev)
+            if (next.has(rowId)) next.delete(rowId)
+            else next.add(rowId)
+            return next
+        })
+    }
 
     // Set initial insight month when rawData arrives or component mounts
     useEffect(() => {
@@ -240,13 +250,51 @@ export function OverviewClient({
     const fmtB = (v: number) => `₩${(v / 100000000).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}억`
     const fmtM = (v: number) => `₩${Math.round(v / 1000000).toLocaleString('ko-KR')}M`
 
-    function trendInfo(curr: number, prev: number | null): { trend: "up" | "down" | "neutral", value: string } {
-        if (prev === null || prev === 0) return { trend: "neutral", value: "N/A" }
-        const diff = ((curr - prev) / Math.abs(prev)) * 100
+    function trendInfo(curr: number, prev: number | null, isCost: boolean = false): { trend: "up" | "down" | "neutral", value: string, prevValue: string, diffAmount: string } {
+        const prevValue = prev !== null ? fmtB(prev) : "N/A"
+        if (prev === null || prev === 0) return { trend: "neutral", value: "N/A", prevValue, diffAmount: "N/A" }
+        
+        const diffRaw = curr - prev
+        const diffPct = (diffRaw / Math.abs(prev)) * 100
+        const trend = diffPct > 0 ? "up" : diffPct < 0 ? "down" : "neutral"
+        
         return {
-            trend: diff > 0 ? "up" : diff < 0 ? "down" : "neutral",
-            value: `${Math.abs(diff).toFixed(1)}%`,
+            trend,
+            value: `${Math.abs(diffPct).toFixed(1)}%`,
+            prevValue,
+            diffAmount: fmtB(Math.abs(diffRaw))
         }
+    }
+
+    // Helper components for comparison table (defined inside to reuse formatters/logic)
+    const ComparisonCell = ({ trend, isCost = false }: { trend: { trend: "up" | "down" | "neutral", value: string, prevValue: string, diffAmount: string }, isCost?: boolean }) => {
+        let colorClass = "text-gray-500"
+        if (trend.trend === 'up') colorClass = isCost ? "text-rose-400" : "text-emerald-400"
+        if (trend.trend === 'down') colorClass = isCost ? "text-emerald-400" : "text-rose-400"
+
+        return (
+            <td className="p-3 text-right">
+                <div className={`text-[13px] font-mono font-bold ${colorClass}`}>
+                    {trend.trend === 'up' ? '▲' : trend.trend === 'down' ? '▼' : '-'} {trend.diffAmount} ({trend.value})
+                </div>
+                <div className="text-[11px] text-gray-500 font-mono mt-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                    {trend.prevValue}
+                </div>
+            </td>
+        )
+    }
+
+    const SubRow = ({ label, current, prev, yoy, avg, isCost = false, isVisible = true }: { label: string, current: number, prev?: number, yoy?: number, avg?: number, isCost?: boolean, isVisible?: boolean }) => {
+        if (!isVisible) return null
+        return (
+            <tr className="hover:bg-white/[0.02] transition-all group border-b border-white/[0.02]">
+                <td className="p-3 text-gray-500 text-[13px] pl-8">{label}</td>
+                <td className="p-3 text-right font-mono text-[13px] text-gray-400 bg-white/[0.01]">{fmtB(current)}</td>
+                <ComparisonCell trend={trendInfo(current, prev ?? null, isCost)} isCost={isCost} />
+                <ComparisonCell trend={trendInfo(current, yoy ?? null, isCost)} isCost={isCost} />
+                <ComparisonCell trend={trendInfo(current, avg ?? null, isCost)} isCost={isCost} />
+            </tr>
+        )
     }
 
     const revTrend = trendInfo(selectedData.용역수입.합계, prevData?.용역수입.합계 ?? null)
@@ -256,10 +304,17 @@ export function OverviewClient({
 
     // YoY Logic
     const yoyData = Array.isArray(months) ? months.find(m => {
-        const match = selectedMonth.match(/^(\d+)년\s*(.*)$/);
-        if (!match) return false;
+        const match = selectedMonth.match(/^(\d{2})\.(\d{2})$/);
+        if (!match) {
+            // Fallback for human-readable format if any
+            const matchOld = selectedMonth.match(/^(\d+)년\s*(.*)$/);
+            if (!matchOld) return false;
+            const currentYear = parseInt(matchOld[1], 10);
+            const yoyMonthStr = `${currentYear - 1}년 ${matchOld[2]}`;
+            return m.month === yoyMonthStr;
+        }
         const currentYear = parseInt(match[1], 10);
-        const yoyMonthStr = `${currentYear - 1}년 ${match[2]}`;
+        const yoyMonthStr = `${(currentYear - 1).toString().padStart(2, '0')}.${match[2]}`;
         return m.month === yoyMonthStr;
     }) : null;
 
@@ -337,30 +392,52 @@ export function OverviewClient({
                                         <th className="text-right font-medium p-2 w-[18%]">전년 평균비</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {/* Revenue Row */}
-                                    <tr className="hover:bg-white/[0.02] transition-colors">
-                                        <td className="p-3 text-gray-300 font-medium text-[13px]">용역수입</td>
-                                        <td className="p-3 text-right font-mono font-bold text-indigo-300 bg-white/5">{fmtB(selectedData.용역수입.합계)}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${revTrend.trend === 'up' ? 'text-emerald-400' : revTrend.trend === 'down' ? 'text-rose-400' : 'text-gray-500'}`}>{revTrend.trend === 'up' ? '▲' : revTrend.trend === 'down' ? '▼' : '-'} {revTrend.value}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${yoyData ? (revYoyTrend.trend === 'up' ? 'text-emerald-400' : revYoyTrend.trend === 'down' ? 'text-rose-400' : 'text-gray-400') : 'text-gray-600'}`}>{yoyData ? `${revYoyTrend.trend === 'up' ? '▲' : revYoyTrend.trend === 'down' ? '▼' : '-'} ${revYoyTrend.value}` : 'N/A'}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${average ? (revAvgTrend.trend === 'up' ? 'text-emerald-400' : revAvgTrend.trend === 'down' ? 'text-rose-400' : 'text-gray-400') : 'text-gray-600'}`}>{average ? `${revAvgTrend.trend === 'up' ? '▲' : revAvgTrend.trend === 'down' ? '▼' : '-'} ${revAvgTrend.value}` : 'N/A'}</td>
+                                <tbody className="divide-y divide-white/10">
+                                    {/* Revenue Main Row */}
+                                    <tr 
+                                        className="bg-white/[0.04] font-bold cursor-pointer hover:bg-white/[0.07] transition-colors group"
+                                        onClick={() => toggleRow('revenue')}
+                                    >
+                                        <td className="p-3 text-indigo-300 text-[14px] flex items-center gap-2">
+                                            <ChevronDown className={`h-4 w-4 transition-transform ${expandedRows.has('revenue') ? 'rotate-0' : '-rotate-90'}`} />
+                                            용역수입 합계
+                                        </td>
+                                        <td className="p-3 text-right font-mono font-bold text-indigo-300 bg-white/5 text-[15px]">{fmtB(selectedData.용역수입.합계)}</td>
+                                        <ComparisonCell trend={revTrend} />
+                                        <ComparisonCell trend={revYoyTrend} />
+                                        <ComparisonCell trend={revAvgTrend} />
                                     </tr>
-                                    {/* Costs Row */}
-                                    <tr className="hover:bg-white/[0.02] transition-colors">
-                                        <td className="p-3 text-gray-300 font-medium text-[13px]">변동비</td>
-                                        <td className="p-3 text-right font-mono font-bold text-rose-300 bg-white/5">{fmtB(selectedData.변동비.합계)}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${costTrend.trend === 'up' ? 'text-rose-400' : costTrend.trend === 'down' ? 'text-emerald-400' : 'text-gray-500'}`}>{costTrend.trend === 'up' ? '▲' : costTrend.trend === 'down' ? '▼' : '-'} {costTrend.value}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${yoyData ? (costYoyTrend.trend === 'up' ? 'text-rose-400' : costYoyTrend.trend === 'down' ? 'text-emerald-400' : 'text-gray-400') : 'text-gray-600'}`}>{yoyData ? `${costYoyTrend.trend === 'up' ? '▲' : costYoyTrend.trend === 'down' ? '▼' : '-'} ${costYoyTrend.value}` : 'N/A'}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${average ? (costAvgTrend.trend === 'up' ? 'text-rose-400' : costAvgTrend.trend === 'down' ? 'text-emerald-400' : 'text-gray-400') : 'text-gray-600'}`}>{average ? `${costAvgTrend.trend === 'up' ? '▲' : costAvgTrend.trend === 'down' ? '▼' : '-'} ${costAvgTrend.value}` : 'N/A'}</td>
+                                    {/* Revenue Sub Rows */}
+                                    <SubRow isVisible={expandedRows.has('revenue')} label="└ 조치" current={selectedData.용역수입.조치} prev={prevData?.용역수입.조치} yoy={yoyData?.용역수입.조치} avg={average?.용역수입.조치} />
+                                    <SubRow isVisible={expandedRows.has('revenue')} label="└ 현장" current={selectedData.용역수입.현장} prev={prevData?.용역수입.현장} yoy={yoyData?.용역수입.현장} avg={average?.용역수입.현장} />
+                                    <SubRow isVisible={expandedRows.has('revenue')} label="└ 소액" current={selectedData.용역수입.소액} prev={prevData?.용역수입.소액} yoy={yoyData?.용역수입.소액} avg={average?.용역수입.소액} />
+
+                                    {/* Costs Main Row */}
+                                    <tr 
+                                        className="bg-white/[0.04] font-bold cursor-pointer hover:bg-white/[0.07] transition-colors group"
+                                        onClick={() => toggleRow('costs')}
+                                    >
+                                        <td className="p-3 text-rose-300 text-[14px] flex items-center gap-2">
+                                            <ChevronDown className={`h-4 w-4 transition-transform ${expandedRows.has('costs') ? 'rotate-0' : '-rotate-90'}`} />
+                                            변동비 합계
+                                        </td>
+                                        <td className="p-3 text-right font-mono font-bold text-rose-300 bg-white/5 text-[15px]">{fmtB(selectedData.변동비.합계)}</td>
+                                        <ComparisonCell trend={costTrend} isCost />
+                                        <ComparisonCell trend={costYoyTrend} isCost />
+                                        <ComparisonCell trend={costAvgTrend} isCost />
                                     </tr>
-                                    {/* Margin Row */}
-                                    <tr className="hover:bg-white/[0.02] transition-colors">
-                                        <td className="p-3 text-gray-300 font-medium text-[13px]">공헌이익</td>
-                                        <td className="p-3 text-right font-mono font-bold text-emerald-300 bg-white/5 rounded-b-lg">{fmtB(selectedData.공헌이익)}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${marginTrend.trend === 'up' ? 'text-emerald-400' : marginTrend.trend === 'down' ? 'text-rose-400' : 'text-gray-500'}`}>{marginTrend.trend === 'up' ? '▲' : marginTrend.trend === 'down' ? '▼' : '-'} {marginTrend.value}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${yoyData ? (marginYoyTrend.trend === 'up' ? 'text-emerald-400' : marginYoyTrend.trend === 'down' ? 'text-rose-400' : 'text-gray-400') : 'text-gray-600'}`}>{yoyData ? `${marginYoyTrend.trend === 'up' ? '▲' : marginYoyTrend.trend === 'down' ? '▼' : '-'} ${marginYoyTrend.value}` : 'N/A'}</td>
-                                        <td className={`p-3 text-right text-xs font-mono font-medium ${average ? (marginAvgTrend.trend === 'up' ? 'text-emerald-400' : marginAvgTrend.trend === 'down' ? 'text-rose-400' : 'text-gray-400') : 'text-gray-600'}`}>{average ? `${marginAvgTrend.trend === 'up' ? '▲' : marginAvgTrend.trend === 'down' ? '▼' : '-'} ${marginAvgTrend.value}` : 'N/A'}</td>
+                                    {/* Costs Sub Rows */}
+                                    <SubRow isVisible={expandedRows.has('costs')} label="└ 조치" current={selectedData.변동비.조치} prev={prevData?.변동비.조치} yoy={yoyData?.변동비.조치} avg={average?.변동비.조치} isCost />
+                                    <SubRow isVisible={expandedRows.has('costs')} label="└ 현장" current={selectedData.변동비.현장} prev={prevData?.변동비.현장} yoy={yoyData?.변동비.현장} avg={average?.변동비.현장} isCost />
+                                    <SubRow isVisible={expandedRows.has('costs')} label="└ 소액" current={selectedData.변동비.소액} prev={prevData?.변동비.소액} yoy={yoyData?.변동비.소액} avg={average?.변동비.소액} isCost />
+
+                                    {/* Margin Main Row */}
+                                    <tr className="bg-white/[0.06] font-bold">
+                                        <td className="p-3 text-emerald-400 text-[14px] pl-9">공헌이익</td>
+                                        <td className="p-3 text-right font-mono text-emerald-300 bg-white/5 rounded-b-lg text-[15px]">{fmtB(selectedData.공헌이익)}</td>
+                                        <ComparisonCell trend={marginTrend} />
+                                        <ComparisonCell trend={marginYoyTrend} />
+                                        <ComparisonCell trend={marginAvgTrend} />
                                     </tr>
                                 </tbody>
                             </table>
