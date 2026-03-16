@@ -1,12 +1,13 @@
 export const dynamic = 'force-dynamic'
 
-import { fetchNightworkRatioData, fetchFinancialDetailData } from "@/lib/sheet-data"
+import { fetchNightworkRatioData, fetchFinancialDetailData, fetchNightworkCapData } from "@/lib/sheet-data"
 import { NightworkRatioClient } from "./NightworkRatioClient"
 
 export default async function NightworkRatioPage() {
-    const [ratioData, finData] = await Promise.all([
+    const [ratioData, finData, capData] = await Promise.all([
         fetchNightworkRatioData(),
-        fetchFinancialDetailData()
+        fetchFinancialDetailData(),
+        fetchNightworkCapData()
     ])
-    return <NightworkRatioClient data={ratioData} financialData={finData} />
+    return <NightworkRatioClient data={ratioData} financialData={finData} capData={capData} />
 }

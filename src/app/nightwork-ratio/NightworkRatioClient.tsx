@@ -3,7 +3,7 @@
 import { Bar, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend } from "recharts"
 import { motion } from "framer-motion"
 import { DataTable } from "@/components/dashboard/DataTable"
-import type { NightworkRatioData, FinancialMonthData } from "@/lib/sheet-data"
+import type { NightworkRatioData, FinancialMonthData, NightworkCapData } from "@/lib/sheet-data"
 
 const fmtB = (v: number) => `₩${((v || 0) / 100000000).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}억`
 const fmtPct = (v: number | undefined | null) => (typeof v === 'number') ? `${v.toFixed(2)}%` : '0.00%'
@@ -16,10 +16,12 @@ interface Column {
 
 export function NightworkRatioClient({ 
     data, 
-    financialData 
+    financialData,
+    capData 
 }: { 
     data: NightworkRatioData[],
-    financialData: { months: FinancialMonthData[], average: FinancialMonthData | null }
+    financialData: { months: FinancialMonthData[], average: FinancialMonthData | null },
+    capData: NightworkCapData[]
 }) {
     if (!data || data.length === 0) {
         return <div className="flex items-center justify-center h-64 text-gray-500">데이터를 불러오는 중...</div>
@@ -28,6 +30,7 @@ export function NightworkRatioClient({
     // Merge data by month
     const chartData = data.map(d => {
         const fin = financialData.months.find(f => f.month === d.month);
+        const cap = capData.find(c => c.month === d.month);
         
         // Calculate Margin Rates based on formula: (1 - Variable Cost / Revenue)
         const hyunjangMargin = fin && fin.용역수입.현장 > 0 
@@ -49,6 +52,7 @@ export function NightworkRatioClient({
             현장심야: d.hyunjangNight || 0,
             현장비율: d.hyunjangRatio || 0,
             현장이익률: hyunjangMargin,
+            지급상한시공비율: cap ? cap.지급상한시공비율 : null,
             // Small Amount (소액)
             소액전체: d.soaekTotal || 0,
             소액심야: d.soaekNight || 0,
@@ -68,14 +72,15 @@ export function NightworkRatioClient({
         { key: 'nightworkAmount', label: '통합 심야금액', format: (v: any) => fmtB(v) },
     ]
 
-    const RatioChart = ({ title, data, barKeyTotal, barKeyNight, lineRatioKey, lineMarginKey, lineMarginName }: { 
+    const RatioChart = ({ title, data, barKeyTotal, barKeyNight, lineRatioKey, lineMarginKey, lineMarginName, lineCapRatioKey }: { 
         title: string, 
         data: any[], 
         barKeyTotal: string, 
         barKeyNight: string, 
         lineRatioKey: string,
         lineMarginKey?: string,
-        lineMarginName?: string
+        lineMarginName?: string,
+        lineCapRatioKey?: string
     }) => (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -104,6 +109,9 @@ export function NightworkRatioClient({
                         <Line yAxisId="right" name="심야 시공 비율" dataKey={lineRatioKey} stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} />
                         {lineMarginKey && (
                             <Line yAxisId="right" name={lineMarginName || "공헌이익률"} dataKey={lineMarginKey} stroke="#f43f5e" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: '#f43f5e', r: 3 }} />
+                        )}
+                        {lineCapRatioKey && (
+                            <Line yAxisId="right" name="지급상한 비율" dataKey={lineCapRatioKey} stroke="#a855f7" strokeWidth={2} strokeDasharray="3 3" dot={{ fill: '#a855f7', r: 3 }} />
                         )}
                     </ComposedChart>
                 </ResponsiveContainer>
@@ -140,6 +148,7 @@ export function NightworkRatioClient({
                         lineRatioKey="현장비율"
                         lineMarginKey="현장이익률"
                         lineMarginName="현장 공헌이익률"
+                        lineCapRatioKey="지급상한시공비율"
                     />
 
                     {/* 3. 경인_소액 */}
