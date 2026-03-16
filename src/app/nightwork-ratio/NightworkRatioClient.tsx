@@ -92,9 +92,10 @@ export function NightworkRatioClient({
                         <YAxis yAxisId="right" orientation="right" stroke="#525252" tickLine={false} axisLine={false} tick={{ fill: '#a1a1aa', fontSize: 11 }} tickFormatter={(v) => `${v}%`} domain={[0, (dataMax: number) => Math.max(80, dataMax + 10)]} />
                         <Tooltip
                             contentStyle={{ backgroundColor: 'rgba(20,20,23,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: 12 }}
-                            formatter={(value: any, name: string) => {
-                                if (name && (name.includes('비율') || name.includes('이익률'))) return [`${Number(value).toFixed(1)}%`, name];
-                                return [`₩${Number(value).toLocaleString()}`, name];
+                            formatter={(value: any, name: any) => {
+                                const nameStr = String(name);
+                                if (nameStr.includes('비율') || nameStr.includes('이익률')) return [`${Number(value).toFixed(1)}%`, nameStr];
+                                return [`₩${Number(value).toLocaleString()}`, nameStr];
                             }}
                         />
                         <Legend wrapperStyle={{ color: '#a1a1aa', fontSize: 12, paddingTop: 10 }} />
