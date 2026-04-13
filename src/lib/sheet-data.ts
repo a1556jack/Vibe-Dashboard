@@ -771,3 +771,30 @@ export async function fetchAggregatedTeamData(targetMonths: string[]): Promise<R
     return result;
 }
 
+export async function fetchRawDataSummary(targetMonths: string[]): Promise<any> {
+    const rawData = await fetchRawData(targetMonths);
+    if (rawData.length === 0) return { message: "No raw data available for these months." };
+
+    // Group by Service Center and Team for a high-level summary
+    const summary: any = {
+        total_rows: rawData.length,
+        by_service_center: {} as Record<string, any>,
+        recent_projects: rawData.slice(-10).map(r => ({
+            date: r.시공일,
+            team: r.시공팀,
+            customer: r.대리점,
+            project: r.건명,
+            amount: r.시공결과금액
+        }))
+    };
+
+    rawData.forEach(row => {
+        if (!summary.by_service_center[row.서비스센터]) {
+            summary.by_service_center[row.서비스센터] = { count: 0, total_amount: 0 };
+        }
+        summary.by_service_center[row.서비스센터].count++;
+        summary.by_service_center[row.서비스센터].total_amount += row.시공결과금액;
+    });
+
+    return summary;
+}

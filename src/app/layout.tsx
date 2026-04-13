@@ -4,6 +4,7 @@ import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { AIChatbot } from "@/components/dashboard/AIChatbot";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,6 +42,7 @@ export default function RootLayout({
               {children}
             </ErrorBoundary>
           </div>
+          <AIChatbot />
         </main>
       </body>
     </html>
