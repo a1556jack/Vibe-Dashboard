@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     `;
 
     const requestBody = {
-      systemInstruction: {
+      system_instruction: {
         parts: [{ text: systemPrompt }]
       },
       contents: [
@@ -47,7 +47,8 @@ export async function POST(req: Request) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Gemini API Error in Analysis Report:", errorText);
-      return NextResponse.json({ summary: "AI 요약 생성 중 오류가 발생했습니다." }, { status: 500 });
+      // Return 200 with the exact error so the user can see it on the dashboard UI
+      return NextResponse.json({ summary: `[에러 발생] Google 측 상세 응답:\n${errorText}` });
     }
 
     const data = await response.json();

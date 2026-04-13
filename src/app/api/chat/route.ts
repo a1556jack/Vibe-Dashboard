@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemInstruction: {
+        system_instruction: {
           parts: [{ text: systemPrompt }]
         },
         contents: formattedMessages
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Gemini API Error:", errorText);
-      return NextResponse.json({ content: "제미나이 API 호출 중 오류가 발생했습니다. 키가 유효한지 확인해주세요." }, { status: 500 });
+      return NextResponse.json({ content: `[에러 발생] Google 측 상세 응답:\n${errorText}` });
     }
 
     const data = await response.json();
