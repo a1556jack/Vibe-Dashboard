@@ -182,6 +182,8 @@ export function OverviewClient({
     const [showInsightDropdown, setShowInsightDropdown] = useState(false)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+    const [aiSummary, setAiSummary] = useState<string>("")
+    const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
     const toggleRow = (rowId: string) => {
@@ -209,13 +211,15 @@ export function OverviewClient({
     // Clear report on month change
     useEffect(() => {
         setAnalysisResult(null);
+        setAiSummary("");
     }, [selectedMonth, insightMonth])
 
     const handleAnalyze = () => {
         if (isRawDataLoading) return;
         setIsAnalyzing(true)
+        setAiSummary("")
         // simulate a small delay for engine thinking
-        setTimeout(() => {
+        setTimeout(async () => {
             const result = generateAnalysisReport(
                 selectedMonth, insightMonth, months, average,
                 billingData, nightRatioData,
@@ -224,6 +228,28 @@ export function OverviewClient({
             )
             setAnalysisResult(result)
             setIsAnalyzing(false)
+            
+            // Start AI generation
+            if (result.insights.length > 0 || result.reportText) {
+                setIsGeneratingSummary(true);
+                try {
+                    const res = await fetch('/api/analysis-report', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            month: insightMonth,
+                            reportText: result.reportText,
+                            insights: result.insights,
+                        })
+                    });
+                    const data = await res.json();
+                    setAiSummary(data.summary || "");
+                } catch (e) {
+                    setAiSummary("AI 요약 생성 중 오류가 발생했습니다.");
+                } finally {
+                    setIsGeneratingSummary(false);
+                }
+            }
         }, 800)
     }
 
@@ -543,6 +569,25 @@ export function OverviewClient({
 
                         {analysisResult && !isAnalyzing && (
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 pb-4">
+                                {/* AI Executive Summary */}
+                                {aiSummary && (
+                                    <div className="rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 p-5 shadow-[0_0_15px_rgba(99,102,241,0.1)] mt-2">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Sparkles className="h-5 w-5 text-indigo-400" />
+                                            <h4 className="font-bold text-indigo-200">AI 경영진 요약 브리핑</h4>
+                                        </div>
+                                        <div className="text-sm text-indigo-100/90 leading-relaxed whitespace-pre-wrap">
+                                            {aiSummary}
+                                        </div>
+                                    </div>
+                                )}
+                                {isGeneratingSummary && !aiSummary && (
+                                    <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4 flex items-center gap-3 mt-2">
+                                        <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
+                                        <span className="text-sm animate-pulse text-indigo-300">AI가 경영진 브리핑을 작성 중입니다...</span>
+                                    </div>
+                                )}
+
                                 {/* Main Text Report */}
                                 <div>
                                     <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">종합 리포트 (데이터 결합)</div>

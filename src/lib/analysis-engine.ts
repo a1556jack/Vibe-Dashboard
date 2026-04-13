@@ -373,33 +373,75 @@ export function generateAnalysisReport(
         });
     }
 
-    // Insight 5: Extreme Team Inefficiencies
-    const teamMap = new Map<string, { normal: number, extra: number }>();
+    // Insight 5: Z-Score Based Statistical Anomaly Detection & Team Grading (S/A/B/C)
+    const teamMap = new Map<string, { normal: number, extra: number, penalty: number }>();
     currentMonthRaw.forEach(r => {
-        if (!teamMap.has(r.시공팀)) teamMap.set(r.시공팀, { normal: 0, extra: 0 });
+        if (!teamMap.has(r.시공팀)) teamMap.set(r.시공팀, { normal: 0, extra: 0, penalty: 0 });
         const d = teamMap.get(r.시공팀)!;
         d.normal += r.정상시공;
         d.extra += r.시공외지급;
+        d.penalty += r.시공하자공제;
     });
 
-    let worstTeam = '';
-    let maxExtraRatio = 0;
+    const activeTeams: { team: string, extraRatio: number, penaltyRatio: number, normal: number }[] = [];
     teamMap.forEach((v, k) => {
         if (v.normal > 1000000) { // filter only active teams
-            const ratio = v.extra / v.normal;
-            if (ratio > maxExtraRatio) {
-                maxExtraRatio = ratio;
-                worstTeam = k;
-            }
+            activeTeams.push({
+                team: k,
+                extraRatio: v.extra / v.normal,
+                penaltyRatio: v.penalty / v.normal,
+                normal: v.normal
+            });
         }
     });
 
-    if (maxExtraRatio > 0.4) {
-        insights.push({
-            title: '주요 개별 팀 특이 동향',
-            description: `[${worstTeam}] 팀의 기타 시공비용이 정상 시공금액의 ${(maxExtraRatio * 100).toFixed(1)}%에 달합니다. 해당 팀의 장비 사용 내역 및 지원금 세부 검토가 시급합니다.`,
-            type: 'warning'
+    if (activeTeams.length > 2) {
+        // Calculate Mean and Standard Deviation for Extra Ratio
+        const meanExtraRatio = activeTeams.reduce((sum, t) => sum + t.extraRatio, 0) / activeTeams.length;
+        const varianceExtra = activeTeams.reduce((sum, t) => sum + Math.pow(t.extraRatio - meanExtraRatio, 2), 0) / activeTeams.length;
+        const stdDevExtra = Math.sqrt(varianceExtra) || 0.01; // prevent div by zero
+
+        // Z-Score Anomaly Detection
+        const anomalousTeams = activeTeams.filter(t => (t.extraRatio - meanExtraRatio) / stdDevExtra > 2.0); // > 2 Sigma
+        
+        if (anomalousTeams.length > 0) {
+            const teamNames = anomalousTeams.map(t => `${t.team}(${(t.extraRatio * 100).toFixed(1)}%)`).join(', ');
+            insights.push({
+                title: '비정상적 청구액 감지 (Z-Score 통계 분석)',
+                description: `통계적 분석 결과, 평균 대비 2표준편차(2 Sigma)를 벗어나는 과도한 기타 비용이 청구된 팀이 발견되었습니다: [${teamNames}]. 장비 과다 사용 및 허위 청구 여부 조사가 권장됩니다.`,
+                type: 'warning'
+            });
+        }
+
+        // Team Grading (S/A/B/C) based on Z-scores
+        const meanPenaltyRatio = activeTeams.reduce((sum, t) => sum + t.penaltyRatio, 0) / activeTeams.length;
+        const stdDevPenalty = Math.sqrt(activeTeams.reduce((sum, t) => sum + Math.pow(t.penaltyRatio - meanPenaltyRatio, 2), 0) / activeTeams.length) || 0.01;
+
+        const grades = { S: 0, A: 0, B: 0, C: 0 };
+        const cGradeTeams: string[] = [];
+
+        activeTeams.forEach(t => {
+            const zExtra = (t.extraRatio - meanExtraRatio) / stdDevExtra;
+            const zPenalty = (t.penaltyRatio - meanPenaltyRatio) / stdDevPenalty;
+            
+            const totalZ = zExtra + zPenalty;
+
+            if (totalZ < -1.0) grades.S++;
+            else if (totalZ < 0.5) grades.A++;
+            else if (totalZ < 1.5) grades.B++;
+            else {
+                grades.C++;
+                cGradeTeams.push(t.team);
+            }
         });
+
+        if (grades.C > 0) {
+            insights.push({
+                title: '다차원 시공팀 C등급 경고',
+                description: `이번 달 비용 초과 및 하자 누적 통계를 바탕으로 총 ${activeTeams.length}개 팀 중 ${grades.C}개 팀이 관리 대상(C등급)으로 분류되었습니다: [${cGradeTeams.join(', ')}]. 이 팀들에게는 출장 배정 시 보수적 접근이 필요합니다.`,
+                type: 'warning'
+            });
+        }
     }
 
     if (insights.length === 0) {
