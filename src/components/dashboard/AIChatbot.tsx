@@ -79,13 +79,7 @@ export function AIChatbot() {
         body: JSON.stringify({
           messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
           context: {
-            metrics: {
-              current_month: "25.01",
-              total_revenue: "1,245,000,000",
-              total_cost: "850,000,000",
-              recent_activity: "현장 시공 12건 완료"
-            },
-            raw_data_summary: rawDataContext
+            dashboard_data: rawDataContext
           }
         }),
       });
