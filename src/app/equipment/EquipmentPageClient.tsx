@@ -3,23 +3,37 @@
 import { Bar, Line, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, Legend, ReferenceLine } from "recharts"
 import { motion } from "framer-motion"
 import { DataTable } from "@/components/dashboard/DataTable"
-import type { EquipmentCostData } from "@/lib/sheet-data"
+import type { EquipmentCostData, FinancialMonthData, NightworkRatioData } from "@/lib/sheet-data"
 
 const fmtM = (v: number) => `₩${(v / 10000).toLocaleString('ko-KR', { maximumFractionDigits: 0 })}만`
 
-export function EquipmentPageClient({ months, average }: {
+export function EquipmentPageClient({ months, average, finData, nightRatioData }: {
     months: EquipmentCostData[]
     average: EquipmentCostData | null
+    finData: FinancialMonthData[]
+    nightRatioData: NightworkRatioData[]
 }) {
     if (!months || months.length === 0) {
         return <div className="flex items-center justify-center h-64 text-gray-500">데이터를 불러오는 중...</div>
     }
 
-    const chartData = months.map(d => ({
-        month: d.month,
-        장비전체합계: d.장비전체합계,
-        장비비율_퍼시스: d.장비비율_퍼시스,
-    }))
+    const chartData = months.map(d => {
+        const finMatch = finData.find(f => f.month === d.month);
+        const nightMatch = nightRatioData.find(n => n.month === d.month);
+
+        let hyunjangMargin = 0;
+        if (finMatch && finMatch.용역수입.현장 > 0) {
+            hyunjangMargin = (1 - (finMatch.변동비.현장 / finMatch.용역수입.현장)) * 100;
+        }
+
+        return {
+            month: d.month,
+            장비전체합계: d.장비전체합계,
+            장비비율_퍼시스: d.장비비율_퍼시스,
+            현장공헌이익률: hyunjangMargin,
+            심야시공비율: nightMatch?.nightworkRatio || 0,
+        };
+    })
 
     const avgTotal = average ? average.장비전체합계 : (months.length > 0 ? months.reduce((acc, curr) => acc + curr.장비전체합계, 0) / months.length : 0);
     const avgRatio = average ? average.장비비율_퍼시스 : (months.length > 0 ? months.reduce((acc, curr) => acc + curr.장비비율_퍼시스, 0) / months.length : 0);
@@ -73,6 +87,8 @@ export function EquipmentPageClient({ months, average }: {
 
                             <Bar yAxisId="left" name="장비 전체 합계" dataKey="장비전체합계" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40} />
                             <Line yAxisId="right" name="퍼시스 장비 비율" type="monotone" dataKey="장비비율_퍼시스" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4 }} activeDot={{ r: 6 }} />
+                            <Line yAxisId="right" name="현장 공헌이익률" type="monotone" dataKey="현장공헌이익률" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b', r: 3 }} activeDot={{ r: 5 }} />
+                            <Line yAxisId="right" name="심야 시공 비율" type="monotone" dataKey="심야시공비율" stroke="#3b82f6" strokeWidth={2} dot={{ fill: '#3b82f6', r: 3 }} activeDot={{ r: 5 }} />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
