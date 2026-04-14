@@ -14,6 +14,6 @@ export default async function EquipmentPage() {
         months={equipRes.months} 
         average={equipRes.average} 
         finData={finRes.months}
-        nightRatioData={nightRes.months}
+        nightRatioData={nightRes}
     />
 }
