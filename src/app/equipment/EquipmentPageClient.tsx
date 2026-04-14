@@ -72,8 +72,10 @@ export function EquipmentPageClient({ months, average, finData, nightRatioData }
                             <Tooltip
                                 contentStyle={{ backgroundColor: 'rgba(20,20,23,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff' }}
                                 formatter={(value: any, name: any) => {
-                                    if (name === "장비 전체 합계") return [`₩${Number(value).toLocaleString()}`, name]
-                                    return [`${Number(value).toFixed(3)}%`, "장비 비용 비율"]
+                                    if (name === "장비 전체 합계") return [`₩${Number(value).toLocaleString()}`, name];
+                                    if (name === "현장 공헌이익률") return [`${Number(value).toFixed(1)}%`, name];
+                                    if (name === "심야 시공 비율") return [`${Number(value).toFixed(1)}%`, name];
+                                    return [`${Number(value).toFixed(3)}%`, "퍼시스 장비 비율"];
                                 }}
                             />
                             <Legend wrapperStyle={{ color: '#a1a1aa', fontSize: 12 }} />
