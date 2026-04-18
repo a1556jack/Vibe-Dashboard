@@ -111,7 +111,7 @@ export function AITrainingClient() {
 
     return (
         <div className="flex h-screen flex-col overflow-hidden bg-[var(--background)]">
-            <Topbar title="AI 봇 훈련센터" />
+            <Topbar />
 
             <div className="flex-1 overflow-y-auto p-4 lg:p-8 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
                 <div className="mx-auto max-w-5xl space-y-8">
