@@ -1,5 +1,4 @@
 import Papa from 'papaparse';
-import { supabase } from './supabase';
 
 // ============================================================
 // Types
@@ -268,37 +267,91 @@ export function formatMonth(raw: string): string {
 
 export async function fetchFinancialDetailData(): Promise<{ months: FinancialMonthData[], average: FinancialMonthData | null }> {
     try {
-        const { data, error } = await supabase.from('financial_details').select('*');
-        if (error) throw error;
-        if (!data || data.length === 0) return { months: [], average: null };
+        const rows = await fetchCSV(SHEET_0_URL);
+        if (rows.length < 5) return { months: [], average: null };
 
-        const months: FinancialMonthData[] = [];
-        let average: FinancialMonthData | null = null;
+        // CSV structure:
+        // Row 0: Headers ['','','25년 평균','','25년 1월','','25년 2월','',...] (pairs: value, %)
+        // Row 1: 용역수입, 조치, val, pct, val, pct, ...
+        // Row 2: '', 현장, val, pct, ...
+        // Row 3: '', 소액, val, pct, ...
+        // Row 4: '', 합계, val, pct, ...
+        // Row 5: 변동비, 조치, val, pct, ...
+        // Row 6: '', 현장, ...
+        // Row 7: '', 소액, ...
+        // Row 8: '', 합계, ...
+        // Row 9: 공헌이익, '', val, pct, ...
 
-        for (const row of data) {
-            const mapped: FinancialMonthData = {
-                month: row.month,
-                용역수입: {
-                    조치: row.rev_action, 현장: row.rev_hyunjang, 소액: row.rev_soaek, 합계: row.rev_total,
-                    조치_pct: row.rev_action_pct, 현장_pct: row.rev_hyunjang_pct, 소액_pct: row.rev_soaek_pct, 합계_pct: row.rev_total_pct,
-                },
-                변동비: {
-                    조치: row.cost_action, 현장: row.cost_hyunjang, 소액: row.cost_soaek, 합계: row.cost_total,
-                    조치_pct: row.cost_action_pct, 현장_pct: row.cost_hyunjang_pct, 소액_pct: row.cost_soaek_pct, 합계_pct: row.cost_total_pct,
-                },
-                공헌이익: row.margin,
-                공헌이익_pct: row.margin_pct,
-            };
+        const headerRow = rows[0];
+        // Find row indices
+        let rev조치 = -1, rev현장 = -1, rev소액 = -1, rev합계 = -1;
+        let cost조치 = -1, cost현장 = -1, cost소액 = -1, cost합계 = -1;
+        let marginIdx = -1;
+        let currentBlock = '';
 
-            if (row.month === '25년 평균') {
-                average = mapped;
-            } else {
-                months.push(mapped);
+        for (let i = 0; i < rows.length; i++) {
+            const col0 = rows[i][0]?.trim();
+            const col1 = rows[i][1]?.trim();
+            if (col0 === '용역수입') { currentBlock = '용역수입'; rev조치 = i; }
+            if (col0 === '변동비') { currentBlock = '변동비'; cost조치 = i; }
+            if (col0 === '공헌이익') { marginIdx = i; }
+
+            if (currentBlock === '용역수입') {
+                if (col1 === '현장') rev현장 = i;
+                if (col1 === '소액') rev소액 = i;
+                if (col1 === '합계') rev합계 = i;
+            }
+            if (currentBlock === '변동비') {
+                if (col1 === '현장') cost현장 = i;
+                if (col1 === '소액') cost소액 = i;
+                if (col1 === '합계') cost합계 = i;
             }
         }
-        
-        // Sort months string alphabetically
-        months.sort((a,b) => a.month.localeCompare(b.month));
+
+        function extractDetailRow(rowIndices: { 조치: number, 현장: number, 소액: number, 합계: number }, colIdx: number): FinancialDetailRow {
+            return {
+                조치: parseNum(rows[rowIndices.조치]?.[colIdx]) * 1000000,
+                현장: parseNum(rows[rowIndices.현장]?.[colIdx]) * 1000000,
+                소액: parseNum(rows[rowIndices.소액]?.[colIdx]) * 1000000,
+                합계: parseNum(rows[rowIndices.합계]?.[colIdx]) * 1000000,
+                조치_pct: parsePercent(rows[rowIndices.조치]?.[colIdx + 1]),
+                현장_pct: parsePercent(rows[rowIndices.현장]?.[colIdx + 1]),
+                소액_pct: parsePercent(rows[rowIndices.소액]?.[colIdx + 1]),
+                합계_pct: parsePercent(rows[rowIndices.합계]?.[colIdx + 1]),
+            };
+        }
+
+        const revIndices = { 조치: rev조치, 현장: rev현장, 소액: rev소액, 합계: rev합계 };
+        const costIndices = { 조치: cost조치, 현장: cost현장, 소액: cost소액, 합계: cost합계 };
+
+        // Extract average (column index 2)
+        const average: FinancialMonthData = {
+            month: '25년 평균',
+            용역수입: extractDetailRow(revIndices, 2),
+            변동비: extractDetailRow(costIndices, 2),
+            공헌이익: parseNum(rows[marginIdx]?.[2]) * 1000000,
+            공헌이익_pct: parsePercent(rows[marginIdx]?.[3]),
+        };
+
+        // Extract monthly data (columns 4, 6, 8, ... in pairs)
+        const months: FinancialMonthData[] = [];
+        for (let i = 4; i < headerRow.length; i += 2) {
+            const monthRaw = headerRow[i]?.trim();
+            if (!monthRaw) continue;
+
+            const revData = extractDetailRow(revIndices, i);
+            // Relax condition: intentionally do not drop the month if 합계 is 0,
+            // because the user might just be adding headers and not yet populated the actual data.
+            // if (isNaN(revData.합계) || revData.합계 === 0) continue;
+
+            months.push({
+                month: formatMonth(monthRaw),
+                용역수입: revData,
+                변동비: extractDetailRow(costIndices, i),
+                공헌이익: parseNum(rows[marginIdx]?.[i]) * 1000000,
+                공헌이익_pct: parsePercent(rows[marginIdx]?.[i + 1]),
+            });
+        }
 
         return { months, average };
     } catch (error) {
@@ -584,58 +637,86 @@ export async function fetchTravelSupportData(): Promise<TravelSupportData[]> {
 
 export async function fetchRawData(targetMonths?: string[]): Promise<RawDataRow[]> {
     try {
-        let query = supabase.from('raw_data').select('*');
-        
-        if (targetMonths && targetMonths.length > 0) {
-            const formattedMonths = targetMonths.map(m => formatMonth(m));
-            query = query.in('year_month', formattedMonths);
+        // Fetch in smaller batches to avoid overwhelming the connection / timeout
+        let allRows: string[][] = [];
+        const batchSize = 4;
+        for (let i = 0; i < RAW_DATA_URLS.length; i += batchSize) {
+            const batchUrls = RAW_DATA_URLS.slice(i, i + batchSize);
+            const batchResults = await Promise.all(batchUrls.map(url => fetchCSV(url)));
+            for (const res of batchResults) {
+                allRows = allRows.concat(res);
+            }
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
-        if (!data) return [];
+        if (allRows.length < 3) {
+            console.error('[sheet-data] No raw data rows found after fetching all URLs');
+            return [];
+        }
 
-        return data.map((row: any) => ({
-            서비스센터: row.service_center,
-            권역시공팀: row.region_team,
-            시공팀: row.team,
-            시공일: row.work_date,
-            대리점: row.agency,
-            건명: row.project_name,
-            주소: row.address,
-            시공예정금액: row.expected_cost,
-            시공결과금액: row.result_cost,
-            시공외지급: row.extra_pay,
-            정상시공: row.normal_pay,
+        console.log(`[sheet-data] Total raw rows to process: ${allRows.length}`);
+        const result: RawDataRow[] = [];
+        const monthSet = targetMonths ? new Set(targetMonths.map(m => formatMonth(m))) : null;
 
-            분해설치_청: row.disassembly_req,
-            공수비_청: row.labor_req,
-            추가분해설치: row.extra_disassembly,
-            공수비: row.labor_cost,
-            인건비: row.manpower_cost,
-            대기비: row.waiting_cost,
-            제품반입비: row.carry_in_cost,
-            추가제품반입비: row.extra_carry_in,
+        for (let i = 0; i < allRows.length; i++) {
+            const row = allRows[i];
+            // Skip header rows by checking if date column looks like a date
+            const dateStr = row[6]?.trim();
+            if (!dateStr || !dateStr.includes('-')) continue; // Skip invalid rows or subtotals
 
-            장비용차: row.equipment_rent,
-            장비용차_지: row.equipment_rent_pay,
-            출장비_지: row.travel_pay,
-            파레트회수비: row.pallet_return,
-            숙식비_지: row.lodging_pay,
-            추가숙박비: row.extra_lodging,
-            AS지원_불요: row.as_support_unnecessary,
-            AS: row.as_support,
-            주중야간: row.weekday_night,
-            주중심야: row.weekday_midnight,
-            주말야간: row.weekend_night,
-            주말심야: row.weekend_midnight,
-            기타지원: row.etc_support,
+            // Extract YYYY-MM
+            const match = dateStr.match(/^(\d{4})-(\d{2})/);
+            let yearMonth = '';
+            if (match) {
+                yearMonth = `${match[1].slice(2)}.${match[2]}`; // "2025-01" -> "25.01", "2026-01" -> "26.01"
+            }
 
-            시공하자공제: row.defect_deduction,
-            기타공제: row.etc_deduction,
-            공동시공분할: row.joint_split,
-            yearMonth: row.year_month
-        }));
+            // FILTERING: Only include if month is in target list (if provided)
+            if (monthSet && !monthSet.has(yearMonth)) continue;
+
+            result.push({
+                서비스센터: row[0]?.trim(),
+                권역시공팀: row[4]?.trim(),
+                시공팀: row[5]?.trim(),
+                시공일: dateStr,
+                대리점: row[7]?.trim(),
+                건명: row[8]?.trim(),
+                주소: row[9]?.trim(),
+                시공예정금액: parseNum(row[10]),
+                시공결과금액: parseNum(row[11]),
+                시공외지급: parseNum(row[14]),
+                정상시공: parseNum(row[15]),
+
+                분해설치_청: parseNum(row[17]),
+                공수비_청: parseNum(row[21]),
+                추가분해설치: parseNum(row[22]),
+                공수비: parseNum(row[23]),
+                인건비: parseNum(row[24]),
+                대기비: parseNum(row[25]),
+                제품반입비: parseNum(row[28]),
+                추가제품반입비: parseNum(row[29]),
+
+                장비용차: parseNum(row[34]),
+                장비용차_지: parseNum(row[33]),
+                출장비_지: parseNum(row[38]),
+                파레트회수비: parseNum(row[39]),
+                숙식비_지: parseNum(row[31]),
+                추가숙박비: parseNum(row[32]),
+                AS지원_불요: parseNum(row[35]),
+                AS: parseNum(row[36]),
+                주중야간: parseNum(row[43]),
+                주중심야: parseNum(row[44]),
+                주말야간: parseNum(row[46]),
+                주말심야: parseNum(row[47]),
+                기타지원: parseNum(row[51]),
+
+                시공하자공제: parseNum(row[55]),
+                기타공제: parseNum(row[58]),
+                공동시공분할: parseNum(row[60]),
+
+                yearMonth
+            });
+        }
+        return result;
     } catch (error) {
         console.error('[sheet-data] fetchRawData error:', error);
         return [];

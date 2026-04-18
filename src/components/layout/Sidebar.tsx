@@ -1,7 +1,8 @@
 "use client"
 
-import { BarChart3, Receipt, Moon, Truck, Shield, Wallet, Users } from "lucide-react"
+import { BarChart3, Receipt, Moon, Truck, Shield, Wallet, Users, RefreshCw } from "lucide-react"
 import Link from "next/link"
+import { useState } from "react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +18,25 @@ const navigation = [
 
 export function Sidebar() {
     const pathname = usePathname()
+    const [isSyncing, setIsSyncing] = useState(false)
+
+    const handleSync = async () => {
+        setIsSyncing(true)
+        try {
+            const res = await fetch('/api/admin/sync', { method: 'POST' })
+            const data = await res.json()
+            if (data.success) {
+                alert('동기화 완료!')
+                window.location.reload()
+            } else {
+                alert('오류 발생: ' + data.error)
+            }
+        } catch (err) {
+            alert('네트워크 오류')
+        } finally {
+            setIsSyncing(false)
+        }
+    }
 
     return (
         <div className="flex h-screen w-72 flex-col justify-between border-r border-[var(--border)] bg-[var(--sidebar)] p-4 text-[var(--sidebar-foreground)]">
@@ -46,6 +66,22 @@ export function Sidebar() {
                         )
                     })}
                 </nav>
+            </div>
+            
+            <div className="mt-8 border-t border-[rgba(255,255,255,0.1)] pt-4 mb-4 px-2">
+                <button 
+                    onClick={handleSync} 
+                    disabled={isSyncing}
+                    className={cn(
+                        "flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                        isSyncing 
+                            ? "bg-indigo-500/20 text-indigo-300 cursor-not-allowed" 
+                            : "bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20"
+                    )}
+                >
+                    <RefreshCw className={cn("h-4 w-4 shrink-0", isSyncing && "animate-spin")} />
+                    <span>{isSyncing ? "동기화 진행 중..." : "데이터 동기화 (Sync)"}</span>
+                </button>
             </div>
         </div>
     )
