@@ -101,9 +101,17 @@ export function TeamPerformanceClient({
     
     useEffect(() => {
         if (availableMonths.length > 0 && selectedMonths.size === 0) {
-            setSelectedMonths(new Set([availableMonths[availableMonths.length - 1]]))
+            let defaultMonth = availableMonths[availableMonths.length - 1];
+            for (let i = availableMonths.length - 1; i >= 0; i--) {
+                const m = availableMonths[i];
+                if (aggregatedData[m] && aggregatedData[m].length > 0) {
+                    defaultMonth = m;
+                    break;
+                }
+            }
+            setSelectedMonths(new Set([defaultMonth]));
         }
-    }, [availableMonths, selectedMonths.size])
+    }, [availableMonths, selectedMonths.size, aggregatedData])
 
     const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("ALL")
     const [checkedRegions, setCheckedRegions] = useState<Set<string>>(new Set())
@@ -111,9 +119,17 @@ export function TeamPerformanceClient({
     // Synchronize selectedMonths when availableMonths changes (Hydration fix)
     useEffect(() => {
         if (availableMonths.length > 0 && Array.from(selectedMonths).every(m => m === "" || !availableMonths.includes(m))) {
-            setSelectedMonths(new Set([availableMonths[availableMonths.length - 1]]));
+            let defaultMonth = availableMonths[availableMonths.length - 1];
+            for (let i = availableMonths.length - 1; i >= 0; i--) {
+                const m = availableMonths[i];
+                if (aggregatedData[m] && aggregatedData[m].length > 0) {
+                    defaultMonth = m;
+                    break;
+                }
+            }
+            setSelectedMonths(new Set([defaultMonth]));
         }
-    }, [availableMonths, selectedMonths])
+    }, [availableMonths, selectedMonths, aggregatedData])
 
     const handleMonthToggle = (m: string) => {
         setSelectedMonths(prev => {
