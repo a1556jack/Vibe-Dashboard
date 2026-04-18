@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       .from('raw_data')
       .select('work_date, region_team, team, project_name, agency, result_cost, normal_pay, extra_pay, year_month')
       .order('work_date', { ascending: false })
-      .limit(1000); // Send the most recent 1000 rows to prevent extreme payload bloat
+      .limit(5000); // 5000건으로 상향 (Gemini 1.5 Flash의 대용량 컨텍스트 윈도우 한계 내 최적화)
 
     let customKnowledgeText = "";
     if (!knowledgeError && knowledgeItems && knowledgeItems.length > 0) {
@@ -31,8 +31,8 @@ export async function POST(req: Request) {
 
     let rawDataText = "";
     if (!rawError && rawDataRows && rawDataRows.length > 0) {
-      rawDataText = "\n\n[실제 RAW DATA (최근 1000건의 상세 시공 내역)]\n" +
-      "사용자가 개별 건명, 특정 팀의 실적, 혹은 날짜별 원본 데이터(RAW DATA)에 대해 물어보면 이 데이터를 분석하여 답변하세요.\n" +
+      rawDataText = "\n\n[실제 RAW DATA (방대한 최근 5000건의 상세 시공 내역 전체)]\n" +
+      "사용자가 개별 건명, 특정 팀의 실적, 혹은 날짜별 원본 데이터(RAW DATA)에 대해 물어보면 반드시 이 데이터를 적극적으로 분석하여 답변하세요.\n" +
       JSON.stringify(rawDataRows);
     }
 
