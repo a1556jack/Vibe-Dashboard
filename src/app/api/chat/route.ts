@@ -12,6 +12,13 @@ export async function POST(req: Request) {
       .select('*')
       .eq('is_active', true);
 
+    // Fetch recent RAW DATA from Supabase for deep analysis
+    const { data: rawDataRows, error: rawError } = await supabase
+      .from('raw_data')
+      .select('work_date, region_team, team, project_name, agency, result_cost, normal_pay, extra_pay, year_month')
+      .order('work_date', { ascending: false })
+      .limit(1000); // Send the most recent 1000 rows to prevent extreme payload bloat
+
     let customKnowledgeText = "";
     if (!knowledgeError && knowledgeItems && knowledgeItems.length > 0) {
       customKnowledgeText = "\n\n[학습된 업무 지식 및 규칙 사항 (우선 순위가 가장 높음)]\n" + 
@@ -22,6 +29,13 @@ export async function POST(req: Request) {
         ).join("\n");
     }
 
+    let rawDataText = "";
+    if (!rawError && rawDataRows && rawDataRows.length > 0) {
+      rawDataText = "\n\n[실제 RAW DATA (최근 1000건의 상세 시공 내역)]\n" +
+      "사용자가 개별 건명, 특정 팀의 실적, 혹은 날짜별 원본 데이터(RAW DATA)에 대해 물어보면 이 데이터를 분석하여 답변하세요.\n" +
+      JSON.stringify(rawDataRows);
+    }
+
     // Prepare the system prompt with dashboard data context
     const systemPrompt = `
       당신은 퍼시스 Vibe Dashboard의 최고 레벨 AI 어시스턴트입니다. 
@@ -30,9 +44,10 @@ export async function POST(req: Request) {
       [대시보드 실시간 데이터 컨텍스트]
       ${JSON.stringify(context, null, 2)}
       ${customKnowledgeText}
+      ${rawDataText}
       
       답변 가이드라인:
-      1. 데이터를 바탕으로 구체적인 수치를 언급하며 답변하세요.
+      1. 사용자가 'RAW DATA' 나 '원본 데이터', '상세 내역' 등을 물어보면 [실제 RAW DATA]를 직접 뒤져서 정확한 수치와 건명을 답변하세요.
       2. 한국어로 친절하고 도메인 전문가처럼 답변하세요.
       3. ★만약 질문이나 상황이 "학습된 업무 지식 및 규칙 사항"과 관련되어 있다면, 해당 지침을 최우선(절대적)으로 적용하여 답변을 생성하세요.★
       4. 데이터나 지식에 없는 내용에 대해서는 억지로 추측하지 마세요.
