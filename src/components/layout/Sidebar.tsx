@@ -1,6 +1,6 @@
 "use client"
 
-import { BarChart3, Receipt, Moon, Truck, Shield, Wallet, Users, RefreshCw } from "lucide-react"
+import { BarChart3, Receipt, Moon, Truck, Shield, Wallet, Users, RefreshCw, GraduationCap } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { usePathname } from "next/navigation"
@@ -14,6 +14,7 @@ const navigation = [
     { name: "경인 심야시공 지급 상한", href: "/nightwork-cap", icon: Shield },
     { name: "경인 출장비/기타지원", href: "/travel-support", icon: Wallet },
     { name: "권역별 실적 분석", href: "/team-performance", icon: Users },
+    { name: "AI 봇 훈련센터", href: "/ai-training", icon: GraduationCap },
 ]
 
 export function Sidebar() {
