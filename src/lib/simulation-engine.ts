@@ -52,6 +52,8 @@ export interface RawDataRow {
     originalPay: number; // 지급시공비(O열)
     // Results
     timeCategory: "주간" | "야간" | "심야" | "알수없음";
+    baselineCharge: number; // 현행 (기본설정) 청구비
+    baselinePay: number; // 현행 (기본설정) 지급비
     simulatedCharge: number;
     simulatedPay: number;
 }
@@ -99,16 +101,35 @@ export function determineTimeCategory(minutes: number, config: SimulationConfig)
     return "야간";
 }
 
-export function processSimulationRow(row: Omit<RawDataRow, "timeCategory" | "simulatedCharge" | "simulatedPay">, config: SimulationConfig): RawDataRow {
+export function processSimulationRow(row: Omit<RawDataRow, "timeCategory" | "baselineCharge" | "baselinePay" | "simulatedCharge" | "simulatedPay">, config: SimulationConfig): RawDataRow {
     const minutes = timeToMinutes(row.timeStr);
-    const timeCategory = determineTimeCategory(minutes, config);
     
+    // 1. Calculate Time Categories
+    const timeCategory = determineTimeCategory(minutes, config);
+    const baselineTimeCategory = determineTimeCategory(minutes, DEFAULT_SIMULATION_CONFIG);
+
     const isWeekend = row.dayOfWeek === "토" || row.dayOfWeek === "일";
     const isField = row.isField;
+    const baseCost = row.originalPay;
 
+    // 2. Calculate Baseline Rates (Using DEFAULT_SIMULATION_CONFIG)
+    let baseC_Rate = 1.0;
+    let baseP_Rate = 1.0;
+    const defRates = DEFAULT_SIMULATION_CONFIG.rates;
+
+    if (!isWeekend) {
+        if (baselineTimeCategory === "주간") { baseC_Rate = defRates.weekdayDay.charge / 100; baseP_Rate = defRates.weekdayDay.pay / 100; }
+        else if (baselineTimeCategory === "야간") { baseC_Rate = defRates.weekdayNight.charge / 100; baseP_Rate = defRates.weekdayNight.pay / 100; }
+        else { baseC_Rate = defRates.weekdayLateNight.charge / 100; baseP_Rate = defRates.weekdayLateNight.pay / 100; }
+    } else {
+        if (baselineTimeCategory === "주간") { baseC_Rate = defRates.weekendDay.charge / 100; baseP_Rate = isField ? (defRates.weekendDay.payField / 100) : (defRates.weekendDay.paySmall / 100); }
+        else if (baselineTimeCategory === "야간") { baseC_Rate = defRates.weekendNight.charge / 100; baseP_Rate = defRates.weekendNight.pay / 100; }
+        else { baseC_Rate = defRates.weekendLateNight.charge / 100; baseP_Rate = defRates.weekendLateNight.pay / 100; }
+    }
+
+    // 3. Calculate Simulated Rates (Using User Config)
     let chargeRate = 1.0;
     let payRate = 1.0;
-
     const { rates } = config;
 
     if (!isWeekend) {
@@ -124,11 +145,11 @@ export function processSimulationRow(row: Omit<RawDataRow, "timeCategory" | "sim
         else { chargeRate = rates.weekendLateNight.charge / 100; payRate = rates.weekendLateNight.pay / 100; }
     }
 
-    const baseCost = row.originalPay;
-
     return {
         ...row,
         timeCategory,
+        baselineCharge: baseCost * baseC_Rate,
+        baselinePay: baseCost * baseP_Rate,
         simulatedCharge: baseCost * chargeRate,
         simulatedPay: baseCost * payRate
     };

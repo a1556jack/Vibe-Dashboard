@@ -65,6 +65,8 @@ export function SimulationClient() {
                         originalPay: originalPay,
                         // dummy defaults for computed fields
                         timeCategory: "주간",
+                        baselineCharge: 0,
+                        baselinePay: 0,
                         simulatedCharge: 0,
                         simulatedPay: 0
                     });
@@ -100,7 +102,7 @@ export function SimulationClient() {
                 acc.set(center, { currentPay: 0, simPay: 0, simCharge: 0 });
             }
             const curr = acc.get(center)!;
-            curr.currentPay += row.originalPay;
+            curr.currentPay += row.baselinePay;
             curr.simPay += row.simulatedPay;
             curr.simCharge += row.simulatedCharge;
         });
