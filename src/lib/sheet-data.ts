@@ -642,7 +642,7 @@ export async function fetchRawData(targetMonths?: string[]): Promise<RawDataRow[
     }
 }
 
-export async function fetchAggregatedTeamData(targetMonths: string[]): Promise<Record<string, TeamBreakdown[]>> {
+export async function fetchAggregatedTeamData(targetMonths?: string[]): Promise<Record<string, TeamBreakdown[]>> {
     const rawData = await fetchRawData(targetMonths);
     const result: Record<string, TeamBreakdown[]> = {};
     
@@ -653,7 +653,11 @@ export async function fetchAggregatedTeamData(targetMonths: string[]): Promise<R
         rowsByMonth[row.yearMonth].push(row);
     }
 
-    for (const month of targetMonths) {
+    const monthsToProcess = targetMonths && targetMonths.length > 0 
+        ? targetMonths 
+        : Object.keys(rowsByMonth).sort();
+
+    for (const month of monthsToProcess) {
         const monthRows = rowsByMonth[month] || [];
         const map = new Map<string, { region: string; team: string; resultAmt: number; normal: number; extra: number; dates: Set<string> }>();
 

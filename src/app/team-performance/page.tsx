@@ -1,12 +1,12 @@
 export const dynamic = 'force-dynamic'
 
-import { fetchAggregatedTeamData, fetchFinancialDetailData } from "@/lib/sheet-data"
+import { fetchAggregatedTeamData } from "@/lib/sheet-data"
 import { TeamPerformanceClient } from "./TeamPerformanceClient"
 
 export default async function TeamPerformancePage() {
-    const { months } = await fetchFinancialDetailData()
-    const targetMonths = months.map(m => m.month)
-    const aggregatedData = await fetchAggregatedTeamData(targetMonths)
+    // Fetch all aggregated data without restricting to financial_details months
+    const aggregatedData = await fetchAggregatedTeamData()
+    const availableMonths = Object.keys(aggregatedData).sort()
     
-    return <TeamPerformanceClient aggregatedData={aggregatedData} availableMonths={targetMonths} />
+    return <TeamPerformanceClient aggregatedData={aggregatedData} availableMonths={availableMonths} />
 }
