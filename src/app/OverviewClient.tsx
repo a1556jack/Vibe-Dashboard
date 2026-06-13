@@ -238,8 +238,104 @@ export function OverviewClient({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             month: insightMonth,
+                            selectedMonth: selectedMonth,
                             reportText: result.reportText,
                             insights: result.insights,
+                            financialContext: {
+                                selectedMonth: {
+                                    month: selectedMonth,
+                                    revenue: selectedData ? {
+                                        action: selectedData.용역수입.조치,
+                                        hyunjang: selectedData.용역수입.현장,
+                                        soaek: selectedData.용역수입.소액,
+                                        total: selectedData.용역수입.합계
+                                    } : null,
+                                    cost: selectedData ? {
+                                        action: selectedData.변동비.조치,
+                                        hyunjang: selectedData.변동비.현장,
+                                        soaek: selectedData.변동비.소액,
+                                        total: selectedData.변동비.합계
+                                    } : null,
+                                    margin: selectedData ? selectedData.공헌이익 : null,
+                                    marginPct: selectedData ? selectedData.공헌이익_pct : null,
+                                    equipment: equipData.find(d => d.month === selectedMonth) || null,
+                                    nightworkRatio: nightRatioData.find(d => d.month === selectedMonth) || null,
+                                    nightworkCap: capData.find(d => d.month === selectedMonth) || null,
+                                    travel: travelData.find(d => d.month === selectedMonth) || null
+                                },
+                                previousMonth: prevData ? {
+                                    month: prevData.month,
+                                    revenue: {
+                                        action: prevData.용역수입.조치,
+                                        hyunjang: prevData.용역수입.현장,
+                                        soaek: prevData.용역수입.소액,
+                                        total: prevData.용역수입.합계
+                                    },
+                                    cost: {
+                                        action: prevData.변동비.조치,
+                                        hyunjang: prevData.변동비.현장,
+                                        soaek: prevData.변동비.소액,
+                                        total: prevData.변동비.합계
+                                    },
+                                    margin: prevData.공헌이익,
+                                    marginPct: prevData.공헌이익_pct,
+                                    equipment: equipData.find(d => d.month === prevData.month) || null,
+                                    nightworkRatio: nightRatioData.find(d => d.month === prevData.month) || null,
+                                    nightworkCap: capData.find(d => d.month === prevData.month) || null,
+                                    travel: travelData.find(d => d.month === prevData.month) || null
+                                } : null,
+                                insightMonth: {
+                                    month: insightMonth,
+                                    revenue: (() => {
+                                        const insData = months.find(m => m.month === insightMonth);
+                                        return insData ? {
+                                            action: insData.용역수입.조치,
+                                            hyunjang: insData.용역수입.현장,
+                                            soaek: insData.용역수입.소액,
+                                            total: insData.용역수입.합계
+                                        } : null;
+                                    })(),
+                                    cost: (() => {
+                                        const insData = months.find(m => m.month === insightMonth);
+                                        return insData ? {
+                                            action: insData.변동비.조치,
+                                            hyunjang: insData.변동비.현장,
+                                            soaek: insData.변동비.소액,
+                                            total: insData.변동비.합계
+                                        } : null;
+                                    })(),
+                                    margin: months.find(m => m.month === insightMonth)?.공헌이익 || null,
+                                    marginPct: months.find(m => m.month === insightMonth)?.공헌이익_pct || null,
+                                    equipment: equipData.find(d => d.month === insightMonth) || null,
+                                    nightworkRatio: nightRatioData.find(d => d.month === insightMonth) || null,
+                                    nightworkCap: capData.find(d => d.month === insightMonth) || null,
+                                    travel: travelData.find(d => d.month === insightMonth) || null
+                                },
+                                average: average ? {
+                                    month: "25년 평균",
+                                    revenue: {
+                                        action: average.용역수입.조치,
+                                        hyunjang: average.용역수입.현장,
+                                        soaek: average.용역수입.소액,
+                                        total: average.용역수입.합계
+                                    },
+                                    cost: {
+                                        action: average.변동비.조치,
+                                        hyunjang: average.변동비.현장,
+                                        soaek: average.변동비.소액,
+                                        total: average.변동비.합계
+                                    },
+                                    margin: average.공헌이익,
+                                    marginPct: average.공헌이익_pct,
+                                    equipment: equipAvg,
+                                    nightworkRatio: {
+                                        month: "25년 평균",
+                                        totalAmount: 0,
+                                        nightworkAmount: 0,
+                                        nightworkRatio: nightRatioData.length ? nightRatioData.reduce((acc, curr) => acc + curr.nightworkRatio, 0) / nightRatioData.length : 0
+                                    }
+                                } : null
+                            }
                         })
                     });
                     const data = await res.json();
